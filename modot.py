@@ -35,7 +35,7 @@ def modot(theme_opt, color_opt):
     theme_found, theme_changed = link_theme(
             theme_opt, theme_dir, config.get('default_theme', None))
     color_found, color_changed = link_color(
-            color_opt + '.yaml', color_dir, config.get('default_color', None))
+            color_opt, color_dir, config.get('default_color', None))
     maybe_fail_not_found(theme_found, color_found)
     build_templates(config.get('modules', {}))
 
@@ -57,8 +57,8 @@ def link_theme(theme_opt, theme_dir, default_theme):
 def link_color(color_opt, color_dir, default_color):
     color_found = True
     color_changed = True
-    if color_opt and (color_dir / Path(color_opt)).exists():
-        link(color_dir / Path(color_opt), CONFIG_DIR / COLOR)
+    if color_opt and (color_dir / Path(color_opt + '.yaml')).exists():
+        link(color_dir / Path(color_opt + '.yaml'), CONFIG_DIR / COLOR)
     elif (CONFIG_DIR / COLOR).exists():
         color_changed = False
     elif default_color \
@@ -108,8 +108,10 @@ async def run_script(script):
         print(f'[stderr]\n{stderr.decode()}')
 
 def maybe_fail_not_found(theme_found, color_found):
+    if not theme_found and not color_found:
+        sys.exit("could not find a theme or color to use")
     if not theme_found:
-        sys.exit("theme was not found")
+        sys.exit("could not find a theme to use")
     if not color_found:
-        sys.exit("color was not found")
+        sys.exit("could not find a color to use")
 
