@@ -100,7 +100,10 @@ def link(tgt, link_name):
 def template(color_dict, src_path, tgt_path):
     """ Template the src file against the colors to create the tgt file. """
     tgt_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(src_path, tgt_path)
+    with open(src_path, 'r') as src_file:
+        rendered_str = chevron.render(src_file, color_dict)
+    with open(tgt_path, 'w') as tgt_file:
+        tgt_file.write(rendered_str)
 
 async def run_script(script):
     cmd = ' '.join((str(script),
