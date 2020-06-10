@@ -24,11 +24,13 @@ def modot(theme_opt, color_opt):
     with open(CONFIG_DIR / CONFIG_FILE, 'r') as stream:
         config = yaml.safe_load(stream)
 
-    dots_dir = Path(config.get('dots_path'))
+    dots_dir = Path(config.get('dots_path')).expanduser()
     theme_path = config.get('theme_path', '')
-    theme_dir = Path(theme_path) if theme_path else dots_dir / THEMES
+    theme_dir = Path(theme_path).expanduser() if theme_path else \
+        dots_dir / THEMES
     color_path = config.get('color_path', '')
-    color_dir = Path(color_path) if color_path else dots_dir / COLORS
+    color_dir = Path(color_path).expanduser() if color_path else \
+        dots_dir / COLORS
 
     theme_found, theme_changed = link_theme(
             theme_opt, theme_dir, config.get('default_theme', None))
