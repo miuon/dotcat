@@ -10,6 +10,8 @@ import yaml
 
 from pathlib import Path
 
+COMMON = Path('common')
+HOST = Path('host')
 CONFIG_DIR = Path('~/.config/modot').expanduser()
 CONFIG_FILE = Path('config.yaml')
 THEME = Path('theme')
@@ -39,6 +41,13 @@ def modot(theme_opt, color_opt):
             color_opt, color_dir, config.get('default_color', None))
     maybe_fail_not_found(theme_found, color_found)
     build_templates(config.get('modules', {}))
+    # TODO: FIX ME!!!!!
+    run_scripts(
+        config,
+        dots_dir / COMMON,
+        dots_dir / HOST,
+        CONFIG_DIR / BUILT_THEME,
+        quick=(color_changed and not theme_changed))
 
 def link_theme(theme_opt, theme_dir, default_theme):
     theme_found = True
@@ -104,13 +113,28 @@ def template(color_dict, src_path, tgt_path):
         rendered_str = chevron.render(src_file, color_dict)
     with open(tgt_path, 'w') as tgt_file:
         tgt_file.write(rendered_str)
+    
+def run_scripts(config, common_base_dir, host_base_dir, theme_base_dir, quick):
+    for module in config.get('modules', []):
+        script = module.get('script', '')
+        subdir = module.get('subdir', '')
+        if script and subdir:
+            asyncio.run(run_script(
+                script,
+                common_base_dir / subdir,
+                host_base_dir / subdir,
+                theme_base_dir / subdir,
+                quick))
 
-async def run_script(script):
+async def run_script(script, common_dir, host_dir, theme_dir, quick):
+    # TODO: clean up
     cmd = ' '.join((str(script),
-        '--common', '',
-        '--host', '',
-        '--theme', '',
-        '--color', ''))
+        '--common', str(common_dir),
+        '--host', str(host_dir),
+        '--theme', str(theme_dir)))
+    if quick:
+        # TODO: clean up
+        cmd += ' --quick'
     proc = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,
