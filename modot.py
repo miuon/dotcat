@@ -127,16 +127,14 @@ def run_scripts(config, common_base_dir, host_base_dir, theme_base_dir, quick):
                 quick))
 
 async def run_script(script, common_dir, host_dir, theme_dir, quick):
-    # TODO: clean up
-    cmd = ' '.join((str(script),
-        '--common', str(common_dir),
-        '--host', str(host_dir),
-        '--theme', str(theme_dir)))
-    if quick:
-        # TODO: clean up
-        cmd += ' --quick'
+    modot_env = dict(os.environ)
+    modot_env['MODOT_COMMON'] = common_dir
+    modot_env['MODOT_HOST'] = host_dir
+    modot_env['MODOT_THEME'] = theme_dir
+    modot_env['MODOT_QUICK'] = 'true' if quick else 'false'
     proc = await asyncio.create_subprocess_shell(
-            cmd,
+            script,
+            env=modot_env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
