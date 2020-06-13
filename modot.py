@@ -23,8 +23,12 @@ COLORS = Path('colors')
 @click.command()
 @click.option('-t', '--theme', 'theme_opt', help='Theme to apply')
 @click.option('-c', '--color', 'color_opt', help='Color to apply')
-@click.option('-f', '--full', 'force_mode', help='Force full reload')
-@click.option('-q', '--quick', 'force_mode', help='Force quick reload')
+@click.option(
+    '-f', '--full', 'force_mode', flag_value='full',
+    help='Force full reload')
+@click.option(
+    '-q', '--quick', 'force_mode', flag_value='quick',
+    help='Force quick reload')
 def modot(theme_opt, color_opt, force_mode):
     with open(CONFIG_DIR / CONFIG_FILE, 'r') as stream:
         config = yaml.safe_load(stream)
