@@ -29,7 +29,9 @@ COLORS = Path('colors')
 @click.option(
     '-q', '--quick', 'force_mode', flag_value='quick',
     help='Force quick reload')
-def modot(theme_opt, color_opt, force_mode):
+@click.option('--list-themes', 'list_opt', flag_value='themes')
+@click.option('--list-colors', 'list_opt', flag_value='colors')
+def modot(theme_opt, color_opt, force_mode, list_opt):
     with open(CONFIG_DIR / CONFIG_FILE, 'r') as stream:
         config = yaml.safe_load(stream)
 
@@ -40,6 +42,15 @@ def modot(theme_opt, color_opt, force_mode):
     color_path = config.get('color_path', '')
     color_dir = Path(color_path).expanduser() if color_path else \
         dots_dir / COLORS
+    
+    if list_opt == 'themes':
+        themes = os.listdir(theme_dir)
+        for theme in themes: print(theme)
+        return
+    elif list_opt == 'colors':
+        colors = [os.path.splitext(fn)[0] for fn in os.listdir(color_dir)]
+        for color in colors: print(color)
+        return
 
     theme_found, theme_changed = link_theme(
             theme_opt, theme_dir, config.get('default_theme', None))
