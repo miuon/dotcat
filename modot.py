@@ -23,7 +23,9 @@ COLORS = Path('colors')
 @click.command()
 @click.option('-t', '--theme', 'theme_opt', help='Theme to apply')
 @click.option('-c', '--color', 'color_opt', help='Color to apply')
-def modot(theme_opt, color_opt):
+@click.option('-f', '--full', 'force_mode')
+@click.option('-q', '--quick', 'force_mode')
+def modot(theme_opt, color_opt, force_mode):
     with open(CONFIG_DIR / CONFIG_FILE, 'r') as stream:
         config = yaml.safe_load(stream)
 
@@ -37,17 +39,16 @@ def modot(theme_opt, color_opt):
 
     theme_found, theme_changed = link_theme(
             theme_opt, theme_dir, config.get('default_theme', None))
-    color_found, color_changed = link_color(
+    color_found, _ = link_color(
             color_opt, color_dir, config.get('default_color', None))
     maybe_fail_not_found(theme_found, color_found)
     build_templates(config.get('modules', {}))
-    # TODO: FIX ME!!!!!
     run_scripts(
         config,
         dots_dir / COMMON,
         dots_dir / HOST,
         CONFIG_DIR / BUILT_THEME,
-        quick=(color_changed and not theme_changed))
+        quick=is_quick_reload(force_mode, theme_changed))
 
 def link_theme(theme_opt, theme_dir, default_theme):
     theme_found = True
@@ -115,6 +116,7 @@ def template(color_dict, src_path, tgt_path):
         tgt_file.write(rendered_str)
     
 def run_scripts(config, common_base_dir, host_base_dir, theme_base_dir, quick):
+    # TODO: is this running concurrently? if not find a way to do so
     for module in config.get('modules', []):
         script = module.get('script', '')
         subdir = module.get('subdir', '')
@@ -152,3 +154,10 @@ def maybe_fail_not_found(theme_found, color_found):
     if not color_found:
         sys.exit("could not find a color to use")
 
+def is_quick_reload(force_mode, theme_changed):
+    if force_mode == 'full':
+        return False
+    elif force_mode == 'quick':
+        return True
+    else:
+        return not theme_changed
