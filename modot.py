@@ -98,7 +98,8 @@ def link_color(color_opt, color_dir, default_color):
 def build_templates(modules):
     built_theme_dir = CONFIG_DIR / BUILT_THEME
     # TODO: make atomic?
-    shutil.rmtree(built_theme_dir)
+    if built_theme_dir.exists():
+        shutil.rmtree(built_theme_dir)
     built_theme_dir.mkdir()
     with open(CONFIG_DIR / COLOR, 'r') as stream:
         color_dict = yaml.safe_load(stream)
