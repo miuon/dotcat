@@ -61,7 +61,7 @@ def modot(theme_opt, color_opt, force_mode, list_opt):
     run_scripts(
         config,
         dots_dir / COMMON,
-        dots_dir / HOST,
+        Path(config.get('host_path', '')).expanduser(),
         CONFIG_DIR / BUILT_THEME,
         quick=is_quick_reload(force_mode, theme_changed))
 
