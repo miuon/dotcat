@@ -1,7 +1,5 @@
 #!/bin/bash
 
-dunstConf=$HOME/.config/dunst
-
 print_usage() {
 	printf "Usage: no arguments\nShould be run from MODOT
 Required environment variables:
@@ -17,22 +15,19 @@ if [ $# -gt 1 ] || [ -z $MODOT_COMMON ] || \
 	print_usage ; exit 1 ;
 fi
 
+rangerConfig=$HOME/.config/ranger
+
 commonDir=`realpath $MODOT_COMMON`
 hostDir=`realpath $MODOT_HOST`
 themeDir=`realpath $MODOT_THEME`
 isQuick=$MODOT_QUICK
 
-mkdir -p $dunstConf >/dev/null
-ln -sf $themeDir/dunstrc $dunstConf/dunstrc
-ln -sf $hostDir/dunst-brightness $dunstConf/dunst-brightness
-ln -sf $hostDir/dunst-volume $dunstConf/dunst-volume
+mkdir -p $rangerConfig
+ln -sf $commonDir/rc.conf $rangerConfig/rc.conf
+ln -sf $commonDir/plugins $rangerConfig/plugins
 
 if [ "$isQuick" = true ]; then
-	echo "reloading dunst"
-	pkill -x dunst
-	dunst >/dev/null 2>/dev/null &
+	nvim +PlugUpdate +qall
 else
-	echo "restarting dunst"
-	pkill -x dunst
-	dunst >/dev/null 2>/dev/null &
+	nvim +PlugUpdate +qall
 fi

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-dunstConf=$HOME/.config/dunst
-
 print_usage() {
 	printf "Usage: no arguments\nShould be run from MODOT
 Required environment variables:
@@ -17,22 +15,15 @@ if [ $# -gt 1 ] || [ -z $MODOT_COMMON ] || \
 	print_usage ; exit 1 ;
 fi
 
+binDir=$HOME/bin
+
 commonDir=`realpath $MODOT_COMMON`
 hostDir=`realpath $MODOT_HOST`
 themeDir=`realpath $MODOT_THEME`
 isQuick=$MODOT_QUICK
 
-mkdir -p $dunstConf >/dev/null
-ln -sf $themeDir/dunstrc $dunstConf/dunstrc
-ln -sf $hostDir/dunst-brightness $dunstConf/dunst-brightness
-ln -sf $hostDir/dunst-volume $dunstConf/dunst-volume
+mkdir -p $binDir
+ln -sf $commonDir/bonsai $binDir
+ln -sf $commonDir/bonsailoop $binDir
+ln -sf $commonDir/colorscript/* $binDir
 
-if [ "$isQuick" = true ]; then
-	echo "reloading dunst"
-	pkill -x dunst
-	dunst >/dev/null 2>/dev/null &
-else
-	echo "restarting dunst"
-	pkill -x dunst
-	dunst >/dev/null 2>/dev/null &
-fi
