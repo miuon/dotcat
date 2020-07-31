@@ -1,11 +1,12 @@
 from setuptools import setup
 setup(
     name='modot',
-    version='0.1',
+    version='0.2',
     description='Modular Overengineered Dotfile Organizer and Manager',
     url='https://github.com/miuon/modot',
     author='miuon',
     author_email='miuon@protonmail.com',
+    packages=['modot'],
 
     install_requires=[
         'chevron',
@@ -14,7 +15,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'modot=modot:modot',
+            'modot=modot.cli:cli',
         ],
     },
 )
