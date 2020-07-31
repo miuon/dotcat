@@ -163,7 +163,7 @@ class Directory():
         return f'Directory: {self.path}'
 
     def make(self):
-        self.path.mkdir(exist_ok=True)
+        self.path.mkdir(parents=True, exist_ok=True)
 
 class Link():
     def __init__(self, file_path, link_path):
