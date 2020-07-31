@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .constants import *
-from .configengine import ConfigEngine
+from .themeengine import ThemeEngine
 from .utils import get_deployed_host, link_atomic
 
 @click.group(invoke_without_command=True)
@@ -41,7 +41,7 @@ def deploy(host_path_string, theme_flag, color_flag, interactive):
     else:
         print('Deploying host config: ' + str(host_path))
     link_atomic(host_path, DEPLOYED_HOST)
-    config = ConfigEngine.host_only(host_path)
+    config = ThemeEngine.host_only(host_path)
     pick_theme_maybe_interactive(config, theme_flag, interactive)
     pick_color_maybe_interactive(config, color_flag, interactive)
     config.read_modules()
@@ -67,7 +67,7 @@ def dryishrun(host_path_string, theme_flag, color_flag, interactive):
     else:
         print('Deploying host config: ' + str(host_path))
     link_atomic(host_path, DEPLOYED_HOST)
-    config = ConfigEngine.host_only(host_path)
+    config = ThemeEngine.host_only(host_path)
     pick_theme_maybe_interactive(config, theme_flag, interactive)
     pick_color_maybe_interactive(config, color_flag, interactive)
     config.read_modules()
@@ -78,7 +78,7 @@ def reload():
     deployed_host_tgt = get_deployed_host()
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
-    config = ConfigEngine()
+    config = ThemeEngine()
     config.read_host(deployed_host_tgt)
     config.read_modules()
     config.regenerate()
@@ -89,7 +89,7 @@ def restart():
     deployed_host_tgt = get_deployed_host()
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
-    config = ConfigEngine()
+    config = ThemeEngine()
     config.read_host(deployed_host_tgt)
     config.read_modules()
     config.regenerate()
@@ -101,7 +101,7 @@ def theme():
 
 @theme.command("list")
 def list_themes_cmd():
-    config = ConfigEngine.host_only(get_deployed_host())
+    config = ThemeEngine.host_only(get_deployed_host())
     for filename in config.list_themes():
         print(filename)
 
@@ -144,7 +144,7 @@ def pick_theme_maybe_interactive(config, flag, interactive):
 @theme.command("set")
 @click.argument("name")
 def set_theme_cmd(name):
-    config = ConfigEngine.host_only(get_deployed_host())
+    config = ThemeEngine.host_only(get_deployed_host())
     if name not in config.list_themes():
         sys.exit(f'Could not find specified theme {name}')
     config.set_theme(config, name)
@@ -158,7 +158,7 @@ def color():
 
 @color.command("list")
 def list_colors_cmd():
-    config = ConfigEngine.host_only(get_deployed_host())
+    config = ThemeEngine.host_only(get_deployed_host())
     for filename in config.list_colors():
         print(filename)
 
@@ -180,7 +180,7 @@ def get_color():
 @color.command("set")
 @click.argument("name")
 def set_color_cmd(name):
-    config = ConfigEngine.host_only(get_deployed_host())
+    config = ThemeEngine.host_only(get_deployed_host())
     if name not in config.list_colors():
         sys.exit(f'Could not find specified theme {name}')
     config.set_color(name)
