@@ -147,7 +147,7 @@ def set_theme_cmd(name):
     config = ThemeEngine.host_only(get_deployed_host())
     if name not in config.list_themes():
         sys.exit(f'Could not find specified theme {name}')
-    config.set_theme(config, name)
+    config.set_theme(name)
     config.read_modules()
     config.regenerate()
     config.execute_restart()
