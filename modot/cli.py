@@ -41,14 +41,10 @@ def deploy(host_path_string, theme_flag, color_flag, interactive):
     else:
         print('Deploying host config: ' + str(host_path))
     link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine.host_only(host_path)
+    config = ThemeEngine(host_path)
     pick_theme_maybe_interactive(config, theme_flag, interactive)
     pick_color_maybe_interactive(config, color_flag, interactive)
-    config.read_modules()
-    config.make_directories()
-    config.make_links()
-    config.regenerate()
-    config.execute_restart()
+    config.deploy()
 
 @cli.command()
 @click.argument("host_path_string",
@@ -56,7 +52,7 @@ def deploy(host_path_string, theme_flag, color_flag, interactive):
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def dryishrun(host_path_string, theme_flag, color_flag, interactive):
+def dryrun(host_path_string, theme_flag, color_flag, interactive):
     host_path = Path(host_path_string)
     deployed_host_tgt = get_deployed_host()
     if deployed_host_tgt:
@@ -67,33 +63,19 @@ def dryishrun(host_path_string, theme_flag, color_flag, interactive):
     else:
         print('Deploying host config: ' + str(host_path))
     link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine.host_only(host_path)
+    config = ThemeEngine(host_path)
     pick_theme_maybe_interactive(config, theme_flag, interactive)
     pick_color_maybe_interactive(config, color_flag, interactive)
-    config.read_modules()
     config.print_actions()
+    print(config.template_dict)
 
 @cli.command()
 def reload():
     deployed_host_tgt = get_deployed_host()
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
-    config = ThemeEngine()
-    config.read_host(deployed_host_tgt)
-    config.read_modules()
-    config.regenerate()
-    config.execute_reload()
-
-@cli.command()
-def restart():
-    deployed_host_tgt = get_deployed_host()
-    if not deployed_host_tgt or not deployed_host_tgt.exists():
-        sys.exit('No deployed host found')
-    config = ThemeEngine()
-    config.read_host(deployed_host_tgt)
-    config.read_modules()
-    config.regenerate()
-    config.execute_restart()
+    config = ThemeEngine(deployed_host_tgt)
+    config.deploy()
 
 @cli.group()
 def theme():
@@ -101,7 +83,7 @@ def theme():
 
 @theme.command("list")
 def list_themes_cmd():
-    config = ThemeEngine.host_only(get_deployed_host())
+    config = ThemeEngine(get_deployed_host())
     for filename in config.list_themes():
         print(filename)
 
@@ -115,7 +97,8 @@ def get_theme_cmd():
 
 def get_theme():
     if ACTIVE_THEME_PATH.exists():
-        return os.path.split(os.readlink(ACTIVE_THEME_PATH))[1]
+        filename = os.path.split(os.readlink(ACTIVE_THEME_PATH))[1]
+        return os.path.splitext(filename)[0]
     else:
         return None
 
@@ -144,13 +127,11 @@ def pick_theme_maybe_interactive(config, flag, interactive):
 @theme.command("set")
 @click.argument("name")
 def set_theme_cmd(name):
-    config = ThemeEngine.host_only(get_deployed_host())
+    config = ThemeEngine(get_deployed_host())
     if name not in config.list_themes():
         sys.exit(f'Could not find specified theme {name}')
     config.set_theme(name)
-    config.read_modules()
-    config.regenerate()
-    config.execute_restart()
+    config.deploy()
 
 @cli.group()
 def color():
@@ -158,7 +139,7 @@ def color():
 
 @color.command("list")
 def list_colors_cmd():
-    config = ThemeEngine.host_only(get_deployed_host())
+    config = ThemeEngine(get_deployed_host())
     for filename in config.list_colors():
         print(filename)
 
@@ -180,13 +161,11 @@ def get_color():
 @color.command("set")
 @click.argument("name")
 def set_color_cmd(name):
-    config = ThemeEngine.host_only(get_deployed_host())
+    config = ThemeEngine(get_deployed_host())
     if name not in config.list_colors():
         sys.exit(f'Could not find specified theme {name}')
     config.set_color(name)
-    config.read_modules()
-    config.regenerate()
-    config.execute_reload()
+    config.deploy()
 
 def pick_color_maybe_interactive(config, flag, interactive):
     deployed_color = get_color()

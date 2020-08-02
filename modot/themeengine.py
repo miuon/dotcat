@@ -8,233 +8,144 @@ import yaml
 from pathlib import Path
 
 from .constants import *
-from .utils import get_deployed_host, link_atomic
+from .utils import link_atomic
 
 class ThemeEngine():
-    def __init__(self):
-        self.directories = []
-        self.links = []
-        self.color_dict = {}
-        self.templates = []
-        self.concats = []
-        self.reload_actions = []
-        self.restart_actions = []
-
-    @classmethod
-    def host_only(cls, host_path):
+    def __init__(self, host_path):
         if not host_path or not host_path.is_file():
             sys.exit('No deployed theme; run modot deploy <host_config>')
-        config = cls()
-        config.read_host(host_path)
-        return config
-
-    def read_config(self, host_path):
-        self.read_host(host_path)
-        self.read_modules()
-
-    def read_host(self, host_path):
         with open(host_path, 'r') as stream:
             host_config = yaml.safe_load(stream)
-        self.common_path = Path(host_config['common_path']).expanduser()
-        self.host_path = Path(host_config['host_path']).expanduser()
-        self.themes_path = Path(host_config['themes_path']).expanduser()
-        self.colors_path = Path(host_config['colors_path']).expanduser()
+
+        self.domains = [Path(domain).expanduser() for
+                domain in host_config.get('domains', [])]
+        self.themes_path = Path(host_config['themes']).expanduser()
+        self.colors_path = Path(host_config['colors']).expanduser()
         self.default_theme = host_config.get('default_theme', '')
         self.default_color = host_config.get('default_color', '')
-        self.modules = host_config['modules']
+        self.modules = host_config.get('modules', [])
+        self.file_tracker = {}
+        self.setup_actions = []
+        # TODO: will need more complex type to avoid noop modifications
+        self.cat_actions = []
+
+        self.read_modules()
 
     def read_modules(self):
-        self.read_color_file()
-        for module_name in self.modules:
-            module_conf_path = self.common_path / Path(module_name) / Path(
-                    'module.yaml')
-            self.read_module(module_conf_path, module_name)
+        for domain in self.domains:
+            domain_path = Path(domain).expanduser()
+            for module_str in self.modules:
+                module_path = domain_path / Path(module_str)
+                module_conf_path = module_path / MODULE_CONFIG_FILE
+                if module_conf_path.exists():
+                    with open(module_conf_path, 'r') as stream:
+                        module_config = yaml.safe_load(stream)
+                    if module_config is None:
+                        module_config = {}
+                    for filestr, fileconf in module_config.items():
+                        self.read_fileconf(module_path, filestr, fileconf)
 
-    def read_module(self, module_conf_path, module_name):
-        with open(module_conf_path, 'r') as stream:
-            module_config = yaml.safe_load(stream)
-        if module_config is None:
-            module_config = {}
-        self.read_directories(module_config.get('directories', []))
-        self.read_links(module_name, module_config.get('links', []))
-        self.read_concats(module_config.get('concats', []))
-        if module_config.get('reload'):
-            self.reload_actions.append(Action(module_config.get('reload')))
-        if module_config.get('restart'):
-            self.restart_actions.append(Action(module_config.get('restart')))
-
-    def read_directories(self, directories):
-        for directory_str in directories:
-            self.directories.append(Directory(Path(directory_str).expanduser()))
-
-    def read_links(self, module_name, links):
-        for link in links:
-            link_from = link.get('from', '')
-            if link.get('template'):
-                self.templates.append(Template(
-                        self.get_dir_path(link_from) /
-                        Path(module_name) / Path(link['src']),
-                        self.color_dict,
-                        Path(link['tgt']).expanduser()))
+    def read_fileconf(self, module_path, filestr, fileconf):
+        paths = sorted(module_path.glob(filestr))
+        readable_path = str(module_path / Path(filestr))
+        out_str = fileconf.get('out', '')
+        if not out_str: # TODO: try/catch?
+            sys.exit(f'No output specified for {readable_path}')
+        out_path = Path(out_str).expanduser()
+        if len(paths) > 1:
+            # dir out
+            # grab all the relative paths somehow?
+            # (maybe relative to module_path?)
+            # (but that's not quite the right behavior -- rethink this)
+            # could also define a seperate action for it
+            # might be more correct vis a vis not reading file state early
+            pass
+        elif len(paths) == 1:
+            path = paths[0]
+            if self.file_tracker.get(str(out_path), False):
+                self.cat_actions.append(CatAction(path, out_path))
             else:
-                self.links.append(Link(
-                        self.get_dir_path(link_from) /
-                        Path(module_name) / Path(link['src']),
-                        Path(link['tgt']).expanduser()))
-
-    def read_concats(self, concats):
-        for concat in concats:
-            self.concats.append(Concat(
-                [Path(src_path).expanduser() for src_path in concat['src']],
-                Path(concat['out']).expanduser()))
-
-    def get_dir_path(self, link_from):
-        if not link_from or link_from in ('common', ''):
-            return self.common_path
-        if link_from in ('host'):
-            return self.host_path
-        if link_from in ('theme'):
-            return ACTIVE_THEME_PATH
-        sys.exit('Problem with "from" in module file') # TODO: helpful info
+                self.file_tracker[str(out_path)] = True
+                self.setup_actions.append(MakeDirAction(out_path.parent))
+                self.setup_actions.append(RemoveAction(out_path))
+                self.cat_actions.append(CatAction(path, out_path))
+        else:
+            sys.exit(f'Could not resolve {readable_path}')
 
     def read_color_file(self):
         with open(ACTIVE_COLOR_PATH, 'r') as stream:
             self.color_dict = yaml.safe_load(stream)
 
     def list_themes(self):
-        return os.listdir(self.themes_path)
+        return [os.path.splitext(fn)[0] for fn in os.listdir(self.themes_path)]
 
     def list_colors(self):
         return [os.path.splitext(fn)[0] for fn in os.listdir(self.colors_path)]
 
     def set_theme(self, name):
-        link_atomic(self.themes_path / Path(name), ACTIVE_THEME_PATH)
+        link_atomic(self.themes_path / Path(name + '.yaml'), ACTIVE_THEME_PATH)
+        if ACTIVE_COLOR_PATH.exists():
+            self.read_template_dict()
 
     def set_color(self, name):
         link_atomic(self.colors_path / Path(name + '.yaml'), ACTIVE_COLOR_PATH)
+        if ACTIVE_THEME_PATH.exists():
+            self.read_template_dict()
+
+    def read_template_dict(self):
+        with open(ACTIVE_COLOR_PATH, 'r') as stream:
+            color_dict = yaml.safe_load(stream)
+        with open(ACTIVE_THEME_PATH, 'r') as stream:
+            theme_dict = yaml.safe_load(stream)
+        # TODO: deep merge
+        self.template_dict = {**color_dict, **theme_dict}
 
     def print_actions(self):
-        print('=== Directories ===')
-        for directory in self.directories:
-            print(directory)
-        print('=== Links ===')
-        for link in self.links:
-            print(link)
-        print('=== Templates ===')
-        for template in self.templates:
-            print(template)
-        print('=== Concats ===')
-        for concat in self.concats:
-            print(concat)
-        print('=== Reloads ===')
-        for action in self.reload_actions:
+        for action in self.setup_actions:
             print(action)
-        print('=== Restarts ===')
-        for action in self.restart_actions:
+        for action in self.cat_actions:
             print(action)
 
-    def make_directories(self):
-        for directory in self.directories:
-            directory.make()
+    def deploy(self):
+        for action in self.setup_actions:
+            action.run()
+        for action in self.cat_actions:
+            action.run(self.template_dict)
 
-    def make_links(self):
-        for link in self.links:
-            link.make()
-
-    def regenerate(self):
-        for template in self.templates:
-            template.make()
-        for concat in self.concats:
-            concat.make()
-
-    def execute_reload(self):
-        for action in self.reload_actions:
-            asyncio.run(action.execute())
-
-    def execute_restart(self):
-        for action in self.restart_actions:
-            asyncio.run(action.execute())
-
-class Directory():
+class MakeDirAction():
     def __init__(self, path):
         self.path = path
 
     def __repr__(self):
-        return f'Directory: {self.path}'
+        return f'Create directory: {self.path}'
 
-    def make(self):
+    def run(self):
         self.path.mkdir(parents=True, exist_ok=True)
 
-class Link():
-    def __init__(self, file_path, link_path):
-        self.file_path = file_path
-        self.link_path = link_path
+class RemoveAction():
+    def __init__(self, path):
+        self.path = path
 
     def __repr__(self):
-        return f'Link: {self.file_path} -> {self.link_path}'
+        return f'Remove: {self.path}'
 
-    def check(self):
-        return False # TODO
+    def run(self):
+        self.path.unlink(missing_ok=True)
 
-    def make(self):
-        tmp_path = Path(self.link_path.parent) / Path('modottmp')
-        os.symlink(self.file_path, tmp_path)
-        os.rename(tmp_path, self.link_path)
-
-class Template():
-    def __init__(self, src_path, color_dict, tgt_path):
+class CatAction():
+    def __init__(self, src_path, out_path):
         self.src_path = src_path
-        self.color_dict = color_dict
-        self.tgt_path = tgt_path
-
-    def __repr__(self):
-        return f'Template: {self.src_path} -> {self.tgt_path}'
-
-    def check(self):
-        return False # TODO
-
-    def make(self):
-        # TODO
-        with open(self.src_path, 'r') as src_file:
-            rendered_str = chevron.render(src_file, self.color_dict)
-        with open(self.tgt_path, 'w') as tgt_file:
-            tgt_file.write(rendered_str)
-
-class Concat():
-    def __init__(self, src_list, out_path):
-        self.src_list = src_list
         self.out_path = out_path
 
     def __repr__(self):
-        list_str = ', '.join(str(src) for src in self.src_list)
-        return f'Concat: {list_str} -> {str(self.out_path)}'
+        return f'Cat: {self.src_path} -> {self.out_path}'
 
-    def check(self):
-        return False # TODO
+    def run(self, template_dict):
+        if self.out_path.exists():
+            self.out_path.chmod(0o644)
+        with open(self.src_path, 'r') as src_file:
+            rendered_str = chevron.render(src_file, template_dict)
+        with open(self.out_path, 'a') as out_file:
+            out_file.write(rendered_str)
+        self.out_path.chmod(0o444)
 
-    def make(self):
-        with open(self.out_path, 'wb') as outfile:
-            for src_path in self.src_list:
-                with open(src_path, 'rb') as infile:
-                    shutil.copyfileobj(infile, outfile)
-
-class Action():
-    def __init__(self, cmd):
-        self.cmd = cmd
-
-    def __repr__(self):
-        return f'Execute: {self.cmd}'
-
-    async def execute(self):
-        modot_env = dict(os.environ)
-        proc = await asyncio.create_subprocess_shell(
-                self.cmd,
-                env=modot_env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE)
-        stdout, stderr = await proc.communicate()
-        print(f'[{self.cmd!r} exited with {proc.returncode}]')
-        if stdout:
-            print(f'[stdout]\n{stdout.decode()}')
-        if stderr:
-            print(f'[stderr]\n{stderr.decode()}')
