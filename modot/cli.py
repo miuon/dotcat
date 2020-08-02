@@ -75,6 +75,7 @@ def reload():
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
     config = ThemeEngine(deployed_host_tgt)
+    config.read_template_dict()
     config.deploy()
 
 @cli.group()

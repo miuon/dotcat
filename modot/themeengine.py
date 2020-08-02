@@ -63,18 +63,16 @@ class ThemeEngine():
         elif len(paths) == 1:
             path = paths[0]
             if self.file_tracker.get(str(out_path), False):
-                self.cat_actions.append(CatAction(path, out_path))
+                self.cat_actions.append(
+                        CatAction(path, out_path, fileconf))
             else:
                 self.file_tracker[str(out_path)] = True
                 self.setup_actions.append(MakeDirAction(out_path.parent))
                 self.setup_actions.append(RemoveAction(out_path))
-                self.cat_actions.append(CatAction(path, out_path))
+                self.cat_actions.append(
+                        CatAction(path, out_path, fileconf))
         else:
             sys.exit(f'Could not resolve {readable_path}')
-
-    def read_color_file(self):
-        with open(ACTIVE_COLOR_PATH, 'r') as stream:
-            self.color_dict = yaml.safe_load(stream)
 
     def list_themes(self):
         return [os.path.splitext(fn)[0] for fn in os.listdir(self.themes_path)]
@@ -93,6 +91,9 @@ class ThemeEngine():
             self.read_template_dict()
 
     def read_template_dict(self):
+        if (not ACTIVE_COLOR_PATH.exists() or
+                not ACTIVE_THEME_PATH.exists()):
+            sys.exit(f'Failed to properly set color/theme')
         with open(ACTIVE_COLOR_PATH, 'r') as stream:
             color_dict = yaml.safe_load(stream)
         with open(ACTIVE_THEME_PATH, 'r') as stream:
@@ -133,9 +134,10 @@ class RemoveAction():
         self.path.unlink(missing_ok=True)
 
 class CatAction():
-    def __init__(self, src_path, out_path):
+    def __init__(self, src_path, out_path, options):
         self.src_path = src_path
         self.out_path = out_path
+        self.executable = options.get('exec', False)
 
     def __repr__(self):
         return f'Cat: {self.src_path} -> {self.out_path}'
@@ -147,5 +149,8 @@ class CatAction():
             rendered_str = chevron.render(src_file, template_dict)
         with open(self.out_path, 'a') as out_file:
             out_file.write(rendered_str)
-        self.out_path.chmod(0o444)
+        if self.executable:
+            self.out_path.chmod(0o544)
+        else:
+            self.out_path.chmod(0o444)
 
