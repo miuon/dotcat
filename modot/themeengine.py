@@ -17,24 +17,24 @@ class ThemeEngine():
         with open(host_path, 'r') as stream:
             host_config = yaml.safe_load(stream)
 
-        self.domains = [Path(domain).expanduser() for
-                domain in host_config.get('domains', [])]
         self.themes_path = Path(host_config['themes']).expanduser()
         self.colors_path = Path(host_config['colors']).expanduser()
         self.default_theme = host_config.get('default_theme', '')
         self.default_color = host_config.get('default_color', '')
-        self.modules = host_config.get('modules', [])
         self.file_tracker = {}
         self.setup_actions = []
         # TODO: will need more complex type to avoid noop modifications
         self.cat_actions = []
 
-        self.read_modules()
+        self.read_modules(
+                [Path(domain).expanduser() for domain in
+                    host_config.get('domains', [])],
+                host_config.get('modules', []))
 
-    def read_modules(self):
-        for domain in self.domains:
+    def read_modules(self, domains, modules):
+        for domain in domains:
             domain_path = Path(domain).expanduser()
-            for module_str in self.modules:
+            for module_str in modules:
                 module_path = domain_path / Path(module_str)
                 module_conf_path = module_path / MODULE_CONFIG_FILE
                 if module_conf_path.exists():
