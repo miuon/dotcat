@@ -21,10 +21,8 @@ class ThemeEngine():
         self.colors_path = Path(host_config['colors']).expanduser()
         self.default_theme = host_config.get('default_theme', '')
         self.default_color = host_config.get('default_color', '')
-        self.file_tracker = {}
         self.setup_actions = []
-        # TODO: will need more complex type to avoid noop modifications
-        self.cat_actions = []
+        self.cat_actions = {}
 
         self.read_modules(
                 [Path(domain).expanduser() for domain in
@@ -49,33 +47,31 @@ class ThemeEngine():
     def read_fileconf(self, filepath: Path, fileconf: dict):
         out_str = fileconf.get('out', '')
         if not out_str: # TODO: try/catch?
-            sys.exit(f'No output specified for {readable_path}')
+            sys.exit(f'No output specified for {filepath}')
         out_path = Path(out_str).expanduser()
         if fileconf.get('dir_contents', False):
             if not filepath.is_dir():
-                sys.exit(f'dir_contents used on non-dir: {str(filepath)}')
+                sys.exit(f'dir_contents used on non-dir: {filepath}')
             if out_path.exists() and not out_path.is_dir():
-                sys.exit(f'{str(filepath)} exists and is not a directory')
+                sys.exit(f'{filepath} exists and is not a directory')
             self.setup_actions.append(MakeDirAction(out_path))
             for src_path in [p for p in filepath.iterdir() if p.is_file()]:
                 out_file_path = out_path / src_path.name
-                if self.file_tracker.get(str(out_path), False):
-                    self.cat_actions.append(
-                            CatAction(src_path, out_file_path, fileconf))
+                cat_action = self.cat_actions.get(str(out_file_path), None)
+                if cat_action:
+                    cat_action.add_path(src_path, fileconf)
                 else:
-                    self.cat_actions.append(
-                            CatAction(src_path, out_file_path, fileconf))
+                    self.cat_actions[str(out_file_path)] = CatAction(
+                            src_path, out_file_path, fileconf)
 
         else:
-            if self.file_tracker.get(str(out_path), False):
-                self.cat_actions.append(
-                        CatAction(filepath, out_path, fileconf))
+            cat_action = self.cat_actions.get(str(out_path), None)
+            if cat_action:
+                cat_action.add_path(filepath, fileconf)
             else:
-                self.file_tracker[str(out_path)] = True
                 self.setup_actions.append(MakeDirAction(out_path.parent))
-                self.setup_actions.append(RemoveAction(out_path))
-                self.cat_actions.append(
-                        CatAction(filepath, out_path, fileconf))
+                self.cat_actions[str(out_path)] = CatAction(
+                        filepath, out_path, fileconf)
 
     def list_themes(self) -> List[str]:
         return [path.stem for path in self.themes_path.iterdir()]
@@ -109,13 +105,13 @@ class ThemeEngine():
     def print_actions(self):
         for action in self.setup_actions:
             print(action)
-        for action in self.cat_actions:
+        for action in self.cat_actions.values():
             print(action)
 
     def deploy(self):
         for action in self.setup_actions:
             action.run()
-        for action in self.cat_actions:
+        for action in self.cat_actions.values():
             action.run(self.template_dict)
 
 class MakeDirAction():
@@ -128,36 +124,32 @@ class MakeDirAction():
     def run(self):
         self.path.mkdir(parents=True, exist_ok=True)
 
-class RemoveAction():
-    def __init__(self, path, is_dir=False):
-        self.path = path
-        self.is_dir = is_dir
-
-    def __repr__(self):
-        return f'Remove: {self.path}'
-
-    def run(self):
-        if self.is_dir:
-            self.path.rmdir()
-        else:
-            self.path.unlink(missing_ok=True)
-
 class CatAction():
     def __init__(self, src_path, out_path, options):
-        self.src_path = src_path
+        self.src_paths = [src_path]
         self.out_path = out_path
         self.executable = options.get('exec', False)
 
     def __repr__(self):
-        return f'Cat: {self.src_path} -> {self.out_path}'
+        return f'Cat: {self.src_paths} -> {self.out_path}'
+
+    def add_path(self, src_path, options):
+        self.src_paths.append(src_path)
+        self.executable = self.executable or options.get('exec', False)
 
     def run(self, template_dict):
-        if self.out_path.exists():
+        if self.out_path.is_dir():
+            # TODO: delete automatically
+            sys.exit(f'Target {self.out_path} is a directory, please delete')
+        elif self.out_path.is_symlink():
+            self.out_path.unlink()
+        elif self.out_path.exists():
             self.out_path.chmod(0o644)
-        with open(self.src_path, 'r') as src_file:
-            rendered_str = chevron.render(src_file, template_dict)
-        with open(self.out_path, 'a') as out_file:
-            out_file.write(rendered_str)
+        with open(self.out_path, 'w') as out_file:
+            for src_path in self.src_paths:
+                with open(src_path, 'r') as src_file:
+                    rendered_str = chevron.render(src_file, template_dict)
+                out_file.write(rendered_str)
         if self.executable:
             self.out_path.chmod(0o544)
         else:
