@@ -129,6 +129,7 @@ class CatAction():
         self.src_paths = [src_path]
         self.out_path = out_path
         self.executable = options.get('exec', False)
+        self.final = options.get('final', False)
 
     def __repr__(self):
         return f'Cat: {self.src_paths} -> {self.out_path}'
@@ -136,10 +137,14 @@ class CatAction():
     def add_path(self, src_path, options):
         self.src_paths.append(src_path)
         self.executable = self.executable or options.get('exec', False)
+        self.final = self.final or options.get('final', False)
 
     def run(self, template_dict):
+        # TODO: perhaps add a check step for this stuff?
+        if self.final and len(self.src_paths) > 1:
+            sys.exit(f'Multiple rules writing to final path {self.out_path}')
         if self.out_path.is_dir():
-            # TODO: delete automatically
+            # TODO: delete automatically?
             sys.exit(f'Target {self.out_path} is a directory, please delete')
         elif self.out_path.is_symlink():
             self.out_path.unlink()
@@ -150,8 +155,5 @@ class CatAction():
                 with open(src_path, 'r') as src_file:
                     rendered_str = chevron.render(src_file, template_dict)
                 out_file.write(rendered_str)
-        if self.executable:
-            self.out_path.chmod(0o544)
-        else:
-            self.out_path.chmod(0o444)
+        self.out_path.chmod(0o544 if self.executable else 0o444)
 
