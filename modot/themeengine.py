@@ -6,12 +6,13 @@ import sys
 import yaml
 
 from pathlib import Path
+from typing import List
 
 from .constants import *
 from .utils import link_atomic
 
 class ThemeEngine():
-    def __init__(self, host_path):
+    def __init__(self, host_path: Path):
         if not host_path or not host_path.is_file():
             sys.exit('No deployed theme; run modot deploy <host_config>')
         with open(host_path, 'r') as stream:
@@ -31,7 +32,7 @@ class ThemeEngine():
                     host_config.get('domains', [])],
                 host_config.get('modules', []))
 
-    def read_modules(self, domains, modules):
+    def read_modules(self, domains: List[str], modules: List[str]):
         for domain in domains:
             domain_path = Path(domain).expanduser()
             for module_str in modules:
@@ -45,7 +46,7 @@ class ThemeEngine():
                     for filestr, fileconf in module_config.items():
                         self.read_fileconf(module_path, filestr, fileconf)
 
-    def read_fileconf(self, module_path, filestr, fileconf):
+    def read_fileconf(self, module_path: Path, filestr: str, fileconf: dict):
         paths = sorted(module_path.glob(filestr))
         readable_path = str(module_path / Path(filestr))
         out_str = fileconf.get('out', '')
@@ -74,7 +75,7 @@ class ThemeEngine():
         else:
             sys.exit(f'Could not resolve {readable_path}')
 
-    def list_themes(self):
+    def list_themes(self) -> List[str]:
         return [os.path.splitext(fn)[0] for fn in os.listdir(self.themes_path)]
 
     def list_colors(self):

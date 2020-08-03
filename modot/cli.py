@@ -13,7 +13,11 @@ from .utils import get_deployed_host, link_atomic
 @click.group(invoke_without_command=True)
 @click.version_option()
 @click.pass_context
-def cli(ctx):
+def cli(ctx: click.Context):
+    """Modular dotfile manager.
+
+    Run without a command for a summary of current state.
+    """
     MODOT_DIR.mkdir(exist_ok=True)
     if ctx.invoked_subcommand is None:
         host = get_deployed_host()
@@ -25,13 +29,13 @@ def cli(ctx):
         print('--help for usage')
 
 @cli.command()
-@click.argument("host_path_string",
-        type=click.Path(exists=True, dir_okay=False))
+@click.argument("host", type=click.Path(exists=True, dir_okay=False))
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def deploy(host_path_string, theme_flag, color_flag, interactive):
-    host_path = Path(host_path_string)
+def deploy(host: str, theme_flag: str, color_flag: str, interactive: bool):
+    """Configure and deploy dotfiles using configuration from HOST."""
+    host_path = Path(host)
     deployed_host_tgt = get_deployed_host()
     if deployed_host_tgt:
         if deployed_host_tgt == host_path:
@@ -47,13 +51,13 @@ def deploy(host_path_string, theme_flag, color_flag, interactive):
     config.deploy()
 
 @cli.command()
-@click.argument("host_path_string",
-        type=click.Path(exists=True, dir_okay=False))
+@click.argument("host", type=click.Path(exists=True, dir_okay=False))
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def dryrun(host_path_string, theme_flag, color_flag, interactive):
-    host_path = Path(host_path_string)
+def dryrun(host: str, theme_flag: str, color_flag: str, interactive: bool):
+    """Configure and print intended actions from HOST."""
+    host_path = Path(host)
     deployed_host_tgt = get_deployed_host()
     if deployed_host_tgt:
         if deployed_host_tgt == host_path:
@@ -71,6 +75,7 @@ def dryrun(host_path_string, theme_flag, color_flag, interactive):
 
 @cli.command()
 def reload():
+    """Redeploy dotfiles from the previously deployed configuration."""
     deployed_host_tgt = get_deployed_host()
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
@@ -84,12 +89,14 @@ def theme():
 
 @theme.command("list")
 def list_themes_cmd():
+    """List all themes found in the themes directory."""
     config = ThemeEngine(get_deployed_host())
     for filename in config.list_themes():
         print(filename)
 
 @theme.command("get")
 def get_theme_cmd():
+    """Print the currently deployed color."""
     theme = get_theme()
     if theme:
         print(theme)
@@ -103,7 +110,56 @@ def get_theme():
     else:
         return None
 
-def pick_theme_maybe_interactive(config, flag, interactive):
+@theme.command("set")
+@click.argument("name")
+def set_theme_cmd(name: str):
+    """Set the theme to NAME and redeploy."""
+    config = ThemeEngine(get_deployed_host())
+    if name not in config.list_themes():
+        sys.exit(f'Could not find specified theme {name}')
+    config.set_theme(name)
+    config.deploy()
+
+@cli.group()
+def color():
+    """Commands controlling the deployed colorscheme."""
+    pass
+
+@color.command("list")
+def list_colors_cmd():
+    """List all colors found in the colors directory."""
+    config = ThemeEngine(get_deployed_host())
+    for filename in config.list_colors():
+        print(filename)
+
+@color.command("get")
+def get_color_cmd():
+    """Print the currently deployed color."""
+    color = get_color()
+    if color:
+        print(color)
+    else:
+        sys.exit('No color currently deployed')
+
+def get_color():
+    if ACTIVE_COLOR_PATH.exists():
+        filename = os.path.split(os.readlink(ACTIVE_COLOR_PATH))[1]
+        return os.path.splitext(filename)[0]
+    else:
+        return None
+
+@color.command("set")
+@click.argument("name")
+def set_color_cmd(name: str):
+    """Set the color to NAME and redeploy."""
+    config = ThemeEngine(get_deployed_host())
+    if name not in config.list_colors():
+        sys.exit(f'Could not find specified theme {name}')
+    config.set_color(name)
+    config.deploy()
+
+def pick_theme_maybe_interactive(
+        config: ThemeEngine, flag: str, interactive: bool):
     deployed_theme = get_theme()
     if flag:
         theme = flag
@@ -125,50 +181,8 @@ def pick_theme_maybe_interactive(config, flag, interactive):
         sys.exit('Could not find a theme to use, set with "theme" subcommand')
     config.set_theme(theme)
 
-@theme.command("set")
-@click.argument("name")
-def set_theme_cmd(name):
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_themes():
-        sys.exit(f'Could not find specified theme {name}')
-    config.set_theme(name)
-    config.deploy()
-
-@cli.group()
-def color():
-    pass
-
-@color.command("list")
-def list_colors_cmd():
-    config = ThemeEngine(get_deployed_host())
-    for filename in config.list_colors():
-        print(filename)
-
-@color.command("get")
-def get_color_cmd():
-    color = get_color()
-    if color:
-        print(color)
-    else:
-        sys.exit('No color currently deployed')
-
-def get_color():
-    if ACTIVE_COLOR_PATH.exists():
-        filename = os.path.split(os.readlink(ACTIVE_COLOR_PATH))[1]
-        return os.path.splitext(filename)[0]
-    else:
-        return None
-
-@color.command("set")
-@click.argument("name")
-def set_color_cmd(name):
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_colors():
-        sys.exit(f'Could not find specified theme {name}')
-    config.set_color(name)
-    config.deploy()
-
-def pick_color_maybe_interactive(config, flag, interactive):
+def pick_color_maybe_interactive(
+        config: ThemeEngine, flag: str, interactive: bool):
     deployed_color = get_color()
     if flag:
         color = flag
