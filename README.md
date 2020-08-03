@@ -1,9 +1,15 @@
 # MODOT
 MOdular DOTfiles
 
-Modular Overengineered Dotfile Organizer and Templater
-
 ## Overview
+
+## Install
+
+## Configuration
+
+### Suggested use
+
+## Design
 
 ### Goals
 * Handle complex cases of host-specific configuration without requiring any repeated dotfiles/dotfile segments. E.g. if you have config you use everywhere you go, config you use on all work machines (even if it needs to stay on-prem) and host-specific config -- modot can handle that cleanly.
@@ -21,14 +27,9 @@ Modular Overengineered Dotfile Organizer and Templater
 * No dangling symlinks, no extra files/state aside from some symlinks in `~/.local/share/modot` to track the deployed host/color/theme.
 * Define only what you need -- a host configuration can be as little as a single config file.
 * Model for storing secrets is simple and flexible -- create a modot domain for each security domain you have, manage the directory however you want, once you've cloned/downloaded/whatever-ed it to a host, just add it as a domain to that host config. The existence of the directory is disclosed in the host config, but since host configs can be anywhere that's easy to fix.
+* Mostly hides differences between tools with config importing and those without.
 
 ### Cons
 * Can't do e.g. `vim .bashrc` anymore. modot will automatically make these files readonly so your edits will fail, but it could be annoying getting in the habit of `vim <path to the sourcefile>`.
 * Ability to do host-specific things is strictly limited to what you can accomplish with file concatenation. E.g. if something host-specific absolutely needs to be injected in the middle of a line, etc. As far as I know this is purely theoretical, though.
 * You have to clean up after yourself -- if you want to rename or remove a file you need to make the changes in any module configs that point to it and delete the generated files from your homedir.
-
-## Install
-
-## Configuration
-
-### Suggested use
