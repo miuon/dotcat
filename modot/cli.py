@@ -5,6 +5,7 @@ import os
 import sys
 
 from pathlib import Path
+from typing import Optional
 
 from .constants import *
 from .themeengine import ThemeEngine
@@ -105,8 +106,7 @@ def get_theme_cmd():
 
 def get_theme():
     if ACTIVE_THEME_PATH.exists():
-        filename = os.path.split(os.readlink(ACTIVE_THEME_PATH))[1]
-        return os.path.splitext(filename)[0]
+        return Path(os.readlink(ACTIVE_THEME_PATH)).stem
     else:
         return None
 
@@ -141,10 +141,9 @@ def get_color_cmd():
     else:
         sys.exit('No color currently deployed')
 
-def get_color():
+def get_color() -> Optional[str]:
     if ACTIVE_COLOR_PATH.exists():
-        filename = os.path.split(os.readlink(ACTIVE_COLOR_PATH))[1]
-        return os.path.splitext(filename)[0]
+        return Path(os.readlink(ACTIVE_COLOR_PATH)).stem
     else:
         return None
 

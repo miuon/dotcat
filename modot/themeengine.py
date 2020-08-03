@@ -1,6 +1,5 @@
 import asyncio
 import chevron
-import os
 import shutil
 import sys
 import yaml
@@ -44,50 +43,55 @@ class ThemeEngine():
                     if module_config is None:
                         module_config = {}
                     for filestr, fileconf in module_config.items():
-                        self.read_fileconf(module_path, filestr, fileconf)
+                        filepath = module_path / Path(filestr)
+                        self.read_fileconf(filepath, fileconf)
 
-    def read_fileconf(self, module_path: Path, filestr: str, fileconf: dict):
-        paths = sorted(module_path.glob(filestr))
-        readable_path = str(module_path / Path(filestr))
+    def read_fileconf(self, filepath: Path, fileconf: dict):
         out_str = fileconf.get('out', '')
         if not out_str: # TODO: try/catch?
             sys.exit(f'No output specified for {readable_path}')
         out_path = Path(out_str).expanduser()
-        if len(paths) > 1:
-            # dir out
-            # grab all the relative paths somehow?
-            # (maybe relative to module_path?)
-            # (but that's not quite the right behavior -- rethink this)
-            # could also define a seperate action for it
-            # might be more correct vis a vis not reading file state early
-            pass
-        elif len(paths) == 1:
-            path = paths[0]
+        if fileconf.get('dir_contents', False):
+            if not filepath.is_dir():
+                sys.exit(f'dir_contents used on non-dir: {str(filepath)}')
+            if out_path.exists() and not out_path.is_dir():
+                sys.exit(f'{str(filepath)} exists and is not a directory')
+            self.setup_actions.append(MakeDirAction(out_path))
+            for src_path in [p for p in filepath.iterdir() if p.is_file()]:
+                out_file_path = out_path / src_path.name
+                if self.file_tracker.get(str(out_path), False):
+                    self.cat_actions.append(
+                            CatAction(src_path, out_file_path, fileconf))
+                else:
+                    self.cat_actions.append(
+                            CatAction(src_path, out_file_path, fileconf))
+
+        else:
             if self.file_tracker.get(str(out_path), False):
                 self.cat_actions.append(
-                        CatAction(path, out_path, fileconf))
+                        CatAction(filepath, out_path, fileconf))
             else:
                 self.file_tracker[str(out_path)] = True
                 self.setup_actions.append(MakeDirAction(out_path.parent))
                 self.setup_actions.append(RemoveAction(out_path))
                 self.cat_actions.append(
-                        CatAction(path, out_path, fileconf))
-        else:
-            sys.exit(f'Could not resolve {readable_path}')
+                        CatAction(filepath, out_path, fileconf))
 
     def list_themes(self) -> List[str]:
-        return [os.path.splitext(fn)[0] for fn in os.listdir(self.themes_path)]
+        return [path.stem for path in self.themes_path.iterdir()]
 
     def list_colors(self):
-        return [os.path.splitext(fn)[0] for fn in os.listdir(self.colors_path)]
+        return [path.stem for path in self.colors_path.iterdir()]
 
     def set_theme(self, name):
-        link_atomic(self.themes_path / Path(name + '.yaml'), ACTIVE_THEME_PATH)
+        link_atomic(self.themes_path /
+                Path(name).with_suffix('.yaml'), ACTIVE_THEME_PATH)
         if ACTIVE_COLOR_PATH.exists():
             self.read_template_dict()
 
     def set_color(self, name):
-        link_atomic(self.colors_path / Path(name + '.yaml'), ACTIVE_COLOR_PATH)
+        link_atomic(self.colors_path /
+                Path(name).with_suffix('.yaml'), ACTIVE_COLOR_PATH)
         if ACTIVE_THEME_PATH.exists():
             self.read_template_dict()
 
@@ -125,14 +129,18 @@ class MakeDirAction():
         self.path.mkdir(parents=True, exist_ok=True)
 
 class RemoveAction():
-    def __init__(self, path):
+    def __init__(self, path, is_dir=False):
         self.path = path
+        self.is_dir = is_dir
 
     def __repr__(self):
         return f'Remove: {self.path}'
 
     def run(self):
-        self.path.unlink(missing_ok=True)
+        if self.is_dir:
+            self.path.rmdir()
+        else:
+            self.path.unlink(missing_ok=True)
 
 class CatAction():
     def __init__(self, src_path, out_path, options):
