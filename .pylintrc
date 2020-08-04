@@ -1,0 +1,4 @@
+[MESSAGES CONTROL]
+# no-else-return:
+#   Disagree with this rule, occasionally explicit else is more readable.
+disable=no-else-return

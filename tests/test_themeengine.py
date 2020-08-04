@@ -3,6 +3,7 @@ import unittest
 
 from modot.themeengine import ThemeEngine
 
+
 class TestThemeEngine(unittest.TestCase):
     '''Test the ThemeEngine'''
 

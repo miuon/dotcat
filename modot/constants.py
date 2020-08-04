@@ -1,3 +1,4 @@
+'''Constants to define magic paths/filenames for modot.'''
 from pathlib import Path
 
 HOST_CONFIG_FILE = Path('config.yaml')
