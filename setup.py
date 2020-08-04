@@ -1,3 +1,4 @@
+'''Package configuraton for modot (MODular DOtfiles)'''
 from setuptools import setup
 setup(
     name='modot',
