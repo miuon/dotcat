@@ -5,9 +5,11 @@ setup(
     description='Modular Overengineered Dotfile Organizer and Manager',
     url='https://github.com/miuon/modot',
     author='miuon',
-    author_email='miuon@protonmail.com',
+    author_email='andrew@miuon.net',
     packages=['modot'],
+    test_suite='tests',
 
+    python_requires=">=3.5",
     install_requires=[
         'chevron',
         'Click',
