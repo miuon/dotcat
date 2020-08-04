@@ -51,7 +51,7 @@ class ThemeEngine():
     def _read_fileconf(self, filepath: Path, fileconf: dict):
         '''Read configuration for a single file deployment rule.'''
         out_str = fileconf.get('out', '')
-        if not out_str:  # TODO: try/catch?
+        if not out_str:
             sys.exit(f'No output specified for {filepath}')
         out_path = Path(out_str).expanduser()
         if fileconf.get('dir_contents', False):
@@ -109,7 +109,6 @@ class ThemeEngine():
             color_dict = yaml.safe_load(stream)
         with open(ACTIVE_THEME_PATH, 'r') as stream:
             theme_dict = yaml.safe_load(stream)
-        # TODO: deep merge
         self.template_dict = {**color_dict, **theme_dict}
 
     def print_actions(self):
@@ -165,7 +164,6 @@ class _CatAction():
     def run(self, template_dict: dict):
         '''Execute the concatenation if it would change the outfile.'''
         self.template_dict = template_dict
-        # TODO: perhaps add a check step for this stuff?
         if self.final and len(self.src_paths) > 1:
             sys.exit(f'Multiple rules writing to final path {self.out_path}')
         if self.out_path.is_dir():
