@@ -115,45 +115,65 @@ class ThemeEngine():
             action.run(self.template_dict)
 
 class MakeDirAction():
-    def __init__(self, path):
+    def __init__(self, path: Path):
         self.path = path
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'Create directory: {self.path}'
 
     def run(self):
+        if self.path.is_symlink():
+            self.path.unlink()
+        elif self.path.exists() and not self.path.is_dir():
+            sys.exit(f'Found a non-dir at {self.path} while trying to mkdir.')
         self.path.mkdir(parents=True, exist_ok=True)
 
 class CatAction():
-    def __init__(self, src_path, out_path, options):
+    def __init__(self, src_path: Path, out_path: Path, options: dict):
         self.src_paths = [src_path]
         self.out_path = out_path
         self.executable = options.get('exec', False)
         self.final = options.get('final', False)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'Cat: {self.src_paths} -> {self.out_path}'
 
-    def add_path(self, src_path, options):
+    def add_path(self, src_path: Path, options: dict):
         self.src_paths.append(src_path)
         self.executable = self.executable or options.get('exec', False)
         self.final = self.final or options.get('final', False)
 
-    def run(self, template_dict):
+    def run(self, template_dict: dict):
+        self.template_dict = template_dict
         # TODO: perhaps add a check step for this stuff?
         if self.final and len(self.src_paths) > 1:
             sys.exit(f'Multiple rules writing to final path {self.out_path}')
         if self.out_path.is_dir():
-            # TODO: delete automatically?
             sys.exit(f'Target {self.out_path} is a directory, please delete')
-        elif self.out_path.is_symlink():
+        if self.out_path.is_symlink():
             self.out_path.unlink()
-        elif self.out_path.exists():
+        if not self.files_equal():
+            self.write_files()
+
+    def files_equal(self) -> bool:
+        if not self.out_path.is_file():
+            return False
+        with open(self.out_path, 'r') as out_file:
+            rendered_str = ''
+            for src_path in self.src_paths:
+                with open(src_path, 'r') as src_file:
+                    rendered_str += chevron.render(
+                            src_file, self.template_dict)
+            return rendered_str == out_file.read()
+
+    def write_files(self):
+        if self.out_path.exists():
             self.out_path.chmod(0o644)
         with open(self.out_path, 'w') as out_file:
             for src_path in self.src_paths:
                 with open(src_path, 'r') as src_file:
-                    rendered_str = chevron.render(src_file, template_dict)
+                    rendered_str = chevron.render(
+                            src_file, self.template_dict)
                 out_file.write(rendered_str)
         self.out_path.chmod(0o544 if self.executable else 0o444)
 
