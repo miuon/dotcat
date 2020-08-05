@@ -1,13 +1,16 @@
+'''Package configuraton for dotcat (DOTfile conCATenator)'''
 from setuptools import setup
 setup(
-    name='modot',
-    version='0.3',
-    description='Modular Overengineered Dotfile Organizer and Manager',
-    url='https://github.com/miuon/modot',
+    name='dotcat',
+    version='0.5',
+    description='DOTfile conCATenator',
+    url='https://github.com/miuon/dotcat',
     author='miuon',
-    author_email='miuon@protonmail.com',
-    packages=['modot'],
+    author_email='andrew@miuon.net',
+    packages=['dotcat'],
+    test_suite='tests',
 
+    python_requires=">=3.5",
     install_requires=[
         'chevron',
         'Click',
@@ -15,7 +18,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'modot=modot.cli:cli',
+            'dotcat=dotcat.cli:cli',
         ],
     },
 )
