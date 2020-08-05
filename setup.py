@@ -2,8 +2,8 @@
 from setuptools import setup
 setup(
     name='modot',
-    version='0.3',
-    description='Modular Overengineered Dotfile Organizer and Manager',
+    version='0.4',
+    description='MOdular DOTfiles',
     url='https://github.com/miuon/modot',
     author='miuon',
     author_email='andrew@miuon.net',
