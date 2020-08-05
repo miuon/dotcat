@@ -151,6 +151,7 @@ class _CatAction():
         self.template_dict = {}
         self.executable = options.get('exec', False)
         self.final = options.get('final', False)
+        self.force_rewrite = options.get('force_rewrite', False)
 
     def __repr__(self) -> str:
         return f'Cat: {self.src_paths} -> {self.out_path}'
@@ -170,7 +171,7 @@ class _CatAction():
             sys.exit(f'Target {self.out_path} is a directory, please delete')
         if self.out_path.is_symlink():
             self.out_path.unlink()
-        if not self._files_equal():
+        if not self._files_equal() or self.force_rewrite:
             self._write_files()
 
     def _files_equal(self) -> bool:
