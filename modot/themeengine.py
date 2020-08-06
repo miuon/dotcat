@@ -6,36 +6,25 @@ import yaml
 
 import chevron
 
-from modot.constants import (MODULE_CONFIG_FILE, ACTIVE_THEME_PATH,
-                             ACTIVE_COLOR_PATH)
-from modot.utils import link_atomic
+
+MODULE_CONFIG_FILE = Path('module.yaml')
 
 
 class ThemeEngine():
     '''Reads and executes configurations for file deployment.'''
-    def __init__(self, host_path: Path):
-        if not host_path or not host_path.is_file():
-            sys.exit('No deployed theme; run modot deploy <host_config>')
-        with open(host_path, 'r') as stream:
-            host_config = yaml.safe_load(stream)
-
-        self.themes_path = Path(host_config['themes']).expanduser()
-        self.colors_path = Path(host_config['colors']).expanduser()
-        self.default_theme = host_config.get('default_theme', '')
-        self.default_color = host_config.get('default_color', '')
-        self.template_dict = {}
+    def __init__(self, state):
+        self.state = state
         self.setup_actions = []
         self.cat_actions = {}
 
         self._read_modules(
             [Path(domain).expanduser() for domain in
-             host_config.get('domains', [])],
-            host_config.get('modules', []))
+             state.get_host_config().get('domains', [])],
+            state.get_host_config().get('modules', []))
 
-    def _read_modules(self, domains: List[str], modules: List[str]):
+    def _read_modules(self, domains: List[Path], modules: List[str]):
         '''Read module.yaml files for chosen modules in chosen domains.'''
-        for domain in domains:
-            domain_path = Path(domain).expanduser()
+        for domain_path in domains:
             for module_str in modules:
                 module_path = domain_path / Path(module_str)
                 module_conf_path = module_path / MODULE_CONFIG_FILE
@@ -78,39 +67,6 @@ class ThemeEngine():
                 self.cat_actions[str(out_path)] = _CatAction(
                     filepath, out_path, fileconf)
 
-    def list_themes(self) -> List[str]:
-        '''List the theme options in the configured theme directory.'''
-        return [path.stem for path in self.themes_path.iterdir()]
-
-    def list_colors(self) -> List[str]:
-        '''List the color options in the configured color directory.'''
-        return [path.stem for path in self.colors_path.iterdir()]
-
-    def set_theme(self, name):
-        '''Change the deployed theme file by changing the active theme link.'''
-        link_atomic(self.themes_path /
-                    Path(name).with_suffix('.yaml'), ACTIVE_THEME_PATH)
-        if ACTIVE_COLOR_PATH.exists():
-            self.read_template_dict()
-
-    def set_color(self, name):
-        '''Change the deployed color file by changing the active color link.'''
-        link_atomic(self.colors_path /
-                    Path(name).with_suffix('.yaml'), ACTIVE_COLOR_PATH)
-        if ACTIVE_THEME_PATH.exists():
-            self.read_template_dict()
-
-    def read_template_dict(self):
-        '''Read the template variables from the theme and color files.'''
-        if (not ACTIVE_COLOR_PATH.exists() or
-                not ACTIVE_THEME_PATH.exists()):
-            sys.exit('Failed to properly set color/theme')
-        with open(ACTIVE_COLOR_PATH, 'r') as stream:
-            color_dict = yaml.safe_load(stream)
-        with open(ACTIVE_THEME_PATH, 'r') as stream:
-            theme_dict = yaml.safe_load(stream)
-        self.template_dict = {**color_dict, **theme_dict}
-
     def print_actions(self):
         '''Print all actions queued to be taken.'''
         for action in self.setup_actions:
@@ -123,7 +79,7 @@ class ThemeEngine():
         for action in self.setup_actions:
             action.run()
         for action in self.cat_actions.values():
-            action.run(self.template_dict)
+            action.run(self.state.get_themecolor_dict())
 
 
 class _MakeDirAction():

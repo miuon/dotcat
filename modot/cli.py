@@ -1,15 +1,11 @@
 ''' CLI for modot command (MOdular DOTfiles).'''
-import os
 from pathlib import Path
 import sys
-from typing import Optional
 
 import click
 
-from modot.constants import (MODOT_DIR, DEPLOYED_HOST, ACTIVE_THEME_PATH,
-                             ACTIVE_COLOR_PATH)
+from modot.state import State
 from modot.themeengine import ThemeEngine
-from modot.utils import get_deployed_host, link_atomic
 
 
 @click.group(invoke_without_command=True)
@@ -20,14 +16,16 @@ def cli(ctx: click.Context):
 
     Run without a command for a summary of current state.
     '''
-    MODOT_DIR.mkdir(exist_ok=True)
+    ctx.ensure_object(dict)
+    ctx.obj['state'] = State()
     if ctx.invoked_subcommand is None:
-        host = get_deployed_host()
+        state = ctx.obj['state']
+        host = state.get_deployed_host()
         print(f'Deployed: {str(host)}' if host else 'No deployed host config')
-        deployed_theme = _get_theme()
+        deployed_theme = state.get_theme()
         print(f'Deployed theme: {deployed_theme}' if deployed_theme else
               'No deployed theme')
-        deployed_color = _get_color()
+        deployed_color = state.get_color()
         print(f'Deployed color: {deployed_color}' if deployed_color else
               'No deployed color')
         print('--help for usage')
@@ -38,21 +36,15 @@ def cli(ctx: click.Context):
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def deploy(host: str, theme_flag: str, color_flag: str, interactive: bool):
+@click.pass_context
+def deploy(
+        ctx, host: str, theme_flag: str, color_flag: str, interactive: bool):
     '''Configure and deploy dotfiles using configuration from HOST.'''
-    host_path = Path(host)
-    deployed_host_tgt = get_deployed_host()
-    if deployed_host_tgt:
-        if deployed_host_tgt == host_path:
-            print(f'Redeploying same host: {str(deployed_host_tgt)}')
-        else:
-            print(f'Deploying over old host: {str(deployed_host_tgt)}')
-    else:
-        print('Deploying host config: ' + str(host_path))
-    link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine(host_path)
-    _pick_theme_maybe_interactive(config, theme_flag, interactive)
-    _pick_color_maybe_interactive(config, color_flag, interactive)
+    state = ctx.obj['state']
+    state.set_host_path(Path(host))
+    config = ThemeEngine(state)
+    _pick_theme_maybe_interactive(state, theme_flag, interactive)
+    _pick_color_maybe_interactive(state, color_flag, interactive)
     config.deploy()
 
 
@@ -61,33 +53,28 @@ def deploy(host: str, theme_flag: str, color_flag: str, interactive: bool):
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def dryrun(host: str, theme_flag: str, color_flag: str, interactive: bool):
+@click.pass_context
+def dryrun(
+        ctx, host: str, theme_flag: str, color_flag: str, interactive: bool):
     '''Configure and print intended actions from HOST.'''
-    host_path = Path(host)
-    deployed_host_tgt = get_deployed_host()
-    if deployed_host_tgt:
-        if deployed_host_tgt == host_path:
-            print(f'Redeploying same host: {str(deployed_host_tgt)}')
-        else:
-            print(f'Deploying over old host: {str(deployed_host_tgt)}')
-    else:
-        print('Deploying host config: ' + str(host_path))
-    link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine(host_path)
-    _pick_theme_maybe_interactive(config, theme_flag, interactive)
-    _pick_color_maybe_interactive(config, color_flag, interactive)
+    state = ctx.obj['state']
+    state.set_host_path(Path(host))
+    config = ThemeEngine(state)
+    _pick_theme_maybe_interactive(state, theme_flag, interactive)
+    _pick_color_maybe_interactive(state, color_flag, interactive)
     config.print_actions()
-    print(config.template_dict)
+    print(state.get_themecolor_dict())
 
 
 @cli.command()
-def reload():
+@click.pass_context
+def reload(ctx):
     '''Redeploy dotfiles from the previously deployed configuration.'''
-    deployed_host_tgt = get_deployed_host()
+    state = ctx.obj['state']
+    deployed_host_tgt = state.get_deployed_host()
     if not deployed_host_tgt or not deployed_host_tgt.exists():
         sys.exit('No deployed host found')
-    config = ThemeEngine(deployed_host_tgt)
-    config.read_template_dict()
+    config = ThemeEngine(state)
     config.deploy()
 
 
@@ -97,39 +84,36 @@ def theme():
 
 
 @theme.command('list')
-def list_themes_cmd():
+@click.pass_context
+def list_themes_cmd(ctx):
     '''List all themes found in the themes directory.'''
-    config = ThemeEngine(get_deployed_host())
-    for filename in config.list_themes():
-        print(filename)
+    state = ctx.obj['state']
+    for theme_name in state.list_themes():
+        print(theme_name)
 
 
 @theme.command('get')
-def get_theme_cmd():
+@click.pass_context
+def get_theme_cmd(ctx):
     '''Print the currently deployed color.'''
-    deployed_theme = _get_theme()
+    state = ctx.obj['state']
+    deployed_theme = state.get_theme()
     if deployed_theme:
         print(deployed_theme)
     else:
         sys.exit('No theme currently deployed')
 
 
-def _get_theme():
-    '''Print the currently deployed theme.'''
-    if ACTIVE_THEME_PATH.exists():
-        return Path(os.readlink(ACTIVE_THEME_PATH)).stem
-    else:
-        return None
-
-
 @theme.command('set')
 @click.argument('name')
-def set_theme_cmd(name: str):
+@click.pass_context
+def set_theme_cmd(ctx, name: str):
     '''Set the theme to NAME and redeploy.'''
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_themes():
+    state = ctx.obj['state']
+    config = ThemeEngine(state)
+    if name not in state.list_themes():
         sys.exit(f'Could not find specified theme {name}')
-    config.set_theme(name)
+    state.set_theme(name)
     config.deploy()
 
 
@@ -139,88 +123,70 @@ def color():
 
 
 @color.command('list')
-def list_colors_cmd():
+@click.pass_context
+def list_colors_cmd(ctx):
     '''List all colors found in the colors directory.'''
-    config = ThemeEngine(get_deployed_host())
-    for filename in config.list_colors():
-        print(filename)
+    state = ctx.obj['state']
+    for color_name in state.list_colors():
+        print(color_name)
 
 
 @color.command('get')
-def get_color_cmd():
+@click.pass_context
+def get_color_cmd(ctx):
     '''Print the currently deployed color.'''
-    deployed_color = _get_color()
+    state = ctx.obj['state']
+    deployed_color = state.get_color()
     if deployed_color:
         print(deployed_color)
     else:
         sys.exit('No color currently deployed')
 
 
-def _get_color() -> Optional[str]:
-    if ACTIVE_COLOR_PATH.exists():
-        return Path(os.readlink(ACTIVE_COLOR_PATH)).stem
-    else:
-        return None
-
-
 @color.command('set')
 @click.argument('name')
-def set_color_cmd(name: str):
+@click.pass_context
+def set_color_cmd(ctx, name: str):
     '''Set the color to NAME and redeploy.'''
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_colors():
+    state = ctx.obj['state']
+    config = ThemeEngine(state)
+    if name not in state.list_colors():
         sys.exit(f'Could not find specified theme {name}')
-    config.set_color(name)
+    state.set_color(name)
     config.deploy()
 
 
 def _pick_theme_maybe_interactive(
-        config: ThemeEngine, flag: str, interactive: bool):
+        state: State, flag: str, interactive: bool) -> str:
     '''Picks a theme and maybe prompts based on current state/interactivity.'''
-    deployed_theme = _get_theme()
-    if flag:
-        picked_theme = flag
-    elif deployed_theme:
-        picked_theme = deployed_theme
-    elif interactive:
-        if config.default_theme:
-            picked_theme = click.prompt(
-                'Select a theme',
-                default=config.default_theme,
-                type=click.Choice(config.list_themes()))
-        else:
-            picked_theme = click.prompt(
-                'Select a theme',
-                type=click.Choice(config.list_themes()))
-    elif config.default_theme:
-        picked_theme = config.default_theme
+    deployed_theme = state.get_theme()
+    default_theme = state.get_host_config().get('default_theme', '')
+    if interactive:
+        picked_theme = flag or deployed_theme or click.prompt(
+            'Select a theme',
+            default=default_theme if default_theme else None,
+            type=click.Choice(state.list_themes()))
     else:
+        picked_theme = flag or deployed_theme or default_theme
+    if not picked_theme:
         sys.exit(
             'Could not find a theme to use, set with \'theme\' subcommand')
-    config.set_theme(picked_theme)
+    return picked_theme
 
 
 def _pick_color_maybe_interactive(
-        config: ThemeEngine, flag: str, interactive: bool):
+        state: State, flag: str, interactive: bool) -> str:
     '''Picks a color and maybe prompts based on current state/interactivity.'''
-    deployed_color = _get_color()
-    if flag:
-        picked_color = flag
-    elif deployed_color:
-        picked_color = deployed_color
-    elif interactive:
-        if config.default_color:
-            picked_color = click.prompt(
-                'Select a color',
-                default=config.default_color,
-                type=click.Choice(config.list_colors()))
-        else:
-            picked_color = click.prompt(
-                'Select a color',
-                type=click.Choice(config.list_colors()))
-    elif config.default_color:
-        picked_color = config.default_color
+    deployed_color = state.get_color()
+    default_color = state.get_host_config().get('default_color', '')
+    if interactive:
+        picked_color = flag or deployed_color or click.prompt(
+            'Select a color',
+            default=default_color if default_color else None,
+            type=click.Choice(state.list_colors()))
     else:
+        picked_color = flag or deployed_color or default_color
+    if not picked_color:
         sys.exit(
             'Could not find a color to use, set with \'color\' subcommand')
-    config.set_color(picked_color)
+    return picked_color
