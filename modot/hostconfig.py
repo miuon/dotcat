@@ -1,8 +1,14 @@
 '''Object for parsing and containing the host configuration.'''
+from dataclasses import dataclass
 from pathlib import Path
 
 
+@dataclass
 class HostConfig():
     '''Parses the host configuration and provides values from it.'''
-    def __init__(self, host_path: Path):
-        '''Populate the host config from the file at the given path.'''
+    themes_path: Path
+    colors_path: Path
+
+
+def from_file(host_path: Path) -> HostConfig:
+    '''Gets a host configuration from the file at the given path.'''

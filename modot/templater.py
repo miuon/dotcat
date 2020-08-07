@@ -5,9 +5,10 @@ from typing import List, Optional
 from modot.hostconfig import HostConfig
 
 
-class Templater():
+class Templater:
     '''Manages theme/color state and provides a function for templating.'''
-    def __init__(self, modot_path: Path, hostconfig: Optional(HostConfig)):
+    def __init__(
+            self, modot_path: Path, hostconfig: Optional[HostConfig] = None):
         '''Initialize the templater and inject dependencies.'''
 
     def get_theme(self) -> Optional[str]:
@@ -32,7 +33,7 @@ class Templater():
         '''Template the provided string with the active theme and color.'''
 
 
-class _ThemeColorCache():
+class _ThemeColorCache:
     def __init__(self):
         pass
 
@@ -41,3 +42,7 @@ class _ThemeColorCache():
 
     def get_themecolor(self) -> dict:
         '''Return the themecolor dict, either from files or cache.'''
+
+
+class LinkMalformedError(Exception):
+    pass
