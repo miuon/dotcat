@@ -32,13 +32,13 @@ class TestTemplater(unittest.TestCase):
         templater = Templater(link_path)
         self.assertEqual(templater.get_theme(), 'cooltheme')
 
-    def test_get_theme_no_link(self):
+    def test_get_theme_no_link_returns_none(self):
         '''Test getting theme with no link present.'''
         link_path = Path(self.link_dir.name)
         templater = Templater(link_path)
         self.assertIsNone(templater.get_theme())
 
-    def test_get_theme_not_a_link(self):
+    def test_get_theme_not_a_link_raises(self):
         '''Test getting theme when the active path isn't a link.'''
         link_path = Path(self.link_dir.name)
         theme_link_path = Path(self.link_dir.name) / Path('theme.yaml')
@@ -47,7 +47,7 @@ class TestTemplater(unittest.TestCase):
         with self.assertRaises(LinkMalformedError):
             templater.get_theme()
 
-    def test_get_theme_link_tgt_malformed(self):
+    def test_get_theme_link_tgt_malformed_raises(self):
         '''Test getting theme from a malformed link target name.'''
         link_path = Path(self.link_dir.name)
         theme_link_path = Path(self.link_dir.name) / Path('theme.yaml')
@@ -68,13 +68,13 @@ class TestTemplater(unittest.TestCase):
         templater = Templater(link_path)
         self.assertEqual(templater.get_color(), 'coolcolor')
 
-    def test_get_color_no_link(self):
+    def test_get_color_no_link_returns_none(self):
         '''Test getting color with no link present.'''
         link_path = Path(self.link_dir.name)
         templater = Templater(link_path)
         self.assertIsNone(templater.get_color())
 
-    def test_get_color_not_a_link(self):
+    def test_get_color_not_a_link_raises(self):
         '''Test getting color when the active path isn't a link.'''
         link_path = Path(self.link_dir.name)
         color_path = Path(self.link_dir.name) / Path('color.yaml')
@@ -83,7 +83,7 @@ class TestTemplater(unittest.TestCase):
         with self.assertRaises(LinkMalformedError):
             templater.get_color()
 
-    def test_get_color_link_malformed(self):
+    def test_get_color_link_malformed_raises(self):
         '''Test getting color from a malformed link target name.'''
         link_path = Path(self.link_dir.name)
         color_link_path = Path(self.link_dir.name) / Path('color.yaml')
@@ -94,7 +94,7 @@ class TestTemplater(unittest.TestCase):
         with self.assertRaises(LinkMalformedError):
             templater.get_color()
 
-    def test_list_theme(self):
+    def test_list_themes(self):
         '''Test listing the available themes.'''
         themes_path = Path(self.theme_dir.name)
         (themes_path / Path('cooltheme.yaml')).touch()
@@ -104,7 +104,14 @@ class TestTemplater(unittest.TestCase):
         self.assertCountEqual(
                 templater.list_themes(), ['cooltheme', 'radtheme'])
 
-    def test_list_theme_path_nonexistent(self):
+    def test_list_themes_dir_empty(self):
+        '''Test listing the themes with none available.'''
+        themes_path = Path(self.theme_dir.name)
+        host_config = HostConfig(themes_path, None)
+        templater = Templater(Path(self.link_dir.name), host_config)
+        self.assertCountEqual(templater.list_themes(), [])
+
+    def test_list_themes_path_nonexistent_raises(self):
         '''Test listing the available themes when the dir does not exist.'''
         themes_path = Path(self.theme_dir.name) / Path('dne')
         host_config = HostConfig(themes_path, None)
@@ -112,7 +119,7 @@ class TestTemplater(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             templater.list_themes()
 
-    def test_list_color(self):
+    def test_list_colors(self):
         '''Test listing the available colors.'''
         colors_path = Path(self.color_dir.name)
         (colors_path / Path('coolcolor.yaml')).touch()
@@ -122,7 +129,14 @@ class TestTemplater(unittest.TestCase):
         self.assertCountEqual(
                 templater.list_colors(), ['coolcolor', 'radcolor'])
 
-    def test_list_color_path_nonexistent(self):
+    def test_list_colors_dir_empty(self):
+        '''Test listing the colors with none available.'''
+        colors_path = Path(self.color_dir.name)
+        host_config = HostConfig(None, colors_path)
+        templater = Templater(Path(self.link_dir.name), host_config)
+        self.assertCountEqual(templater.list_colors(), [])
+
+    def test_list_color_path_nonexistent_raises(self):
         '''Test listing the available colors when the dir does not exist.'''
         colors_path = Path(self.color_dir.name) / Path('dne')
         host_config = HostConfig(None, colors_path)
