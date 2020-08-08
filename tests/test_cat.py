@@ -96,9 +96,12 @@ class TestCat(unittest.TestCase):
 
     def test_execute_nonequal_files_write(self):
         '''A cat that would change the content of the file should write it.'''
+        raise unittest.SkipTest
 
     def test_execute_equal_files_no_write(self):
         '''A cat that would not change the outfile shouldn't open it.'''
+        raise unittest.SkipTest
 
     def test_execute_equal_files_flag_force_write(self):
         '''force_rewrite flag with equal output still writes the outfile.'''
+        raise unittest.SkipTest

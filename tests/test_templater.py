@@ -154,12 +154,16 @@ class TestTemplater(unittest.TestCase):
 
     def test_template(self):
         '''Test templating a string.'''
+        raise unittest.SkipTest
 
     def test_themecolorcache_uncached(self):
         ''''''
+        raise unittest.SkipTest
 
     def test_themecolorcache_cached_clean(self):
         ''''''
+        raise unittest.SkipTest
 
     def test_themecolorcache_cached_dirty(self):
         ''''''
+        raise unittest.SkipTest
