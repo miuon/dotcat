@@ -1,15 +1,15 @@
 ''' CLI for modot command (MOdular DOTfiles).'''
-import os
 from pathlib import Path
 import sys
-from typing import Optional
 
 import click
 
-from modot.constants import (MODOT_DIR, DEPLOYED_HOST, ACTIVE_THEME_PATH,
-                             ACTIVE_COLOR_PATH)
-from modot.themeengine import ThemeEngine
-from modot.utils import get_deployed_host, link_atomic
+from modot import hostconfig
+from modot.templater import Templater
+
+
+MODOT_PATH = Path('~/.local/share/modot').expanduser()
+ACTIVE_HOST_PATH = MODOT_PATH / 'config.yaml'
 
 
 @click.group(invoke_without_command=True)
@@ -20,14 +20,15 @@ def cli(ctx: click.Context):
 
     Run without a command for a summary of current state.
     '''
-    MODOT_DIR.mkdir(exist_ok=True)
+    MODOT_PATH.mkdir(exist_ok=True)
     if ctx.invoked_subcommand is None:
-        host = get_deployed_host()
+        host = hostconfig.get_deployed_host(ACTIVE_HOST_PATH)
         print(f'Deployed: {str(host)}' if host else 'No deployed host config')
-        deployed_theme = _get_theme()
+        templater = Templater(MODOT_PATH)
+        deployed_theme = templater.get_theme()
         print(f'Deployed theme: {deployed_theme}' if deployed_theme else
               'No deployed theme')
-        deployed_color = _get_color()
+        deployed_color = templater.get_color()
         print(f'Deployed color: {deployed_color}' if deployed_color else
               'No deployed color')
         print('--help for usage')
@@ -38,10 +39,12 @@ def cli(ctx: click.Context):
 @click.option('theme_flag', '-t', '--theme')
 @click.option('color_flag', '-c', '--color')
 @click.option('--interactive/--non-interactive', default=True)
-def deploy(host: str, theme_flag: str, color_flag: str, interactive: bool):
+@click.option('--dryrun', is_flag=True, default=False)
+def deploy(host: str, theme_flag: str, color_flag: str,
+           interactive: bool, dryrun: bool):
     '''Configure and deploy dotfiles using configuration from HOST.'''
     host_path = Path(host)
-    deployed_host_tgt = get_deployed_host()
+    deployed_host_tgt = hostconfig.get_deployed_host(ACTIVE_HOST_PATH)
     if deployed_host_tgt:
         if deployed_host_tgt == host_path:
             print(f'Redeploying same host: {str(deployed_host_tgt)}')
@@ -49,46 +52,24 @@ def deploy(host: str, theme_flag: str, color_flag: str, interactive: bool):
             print(f'Deploying over old host: {str(deployed_host_tgt)}')
     else:
         print('Deploying host config: ' + str(host_path))
-    link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine(host_path)
-    _pick_theme_maybe_interactive(config, theme_flag, interactive)
-    _pick_color_maybe_interactive(config, color_flag, interactive)
-    config.deploy()
-
-
-@cli.command()
-@click.argument('host', type=click.Path(exists=True, dir_okay=False))
-@click.option('theme_flag', '-t', '--theme')
-@click.option('color_flag', '-c', '--color')
-@click.option('--interactive/--non-interactive', default=True)
-def dryrun(host: str, theme_flag: str, color_flag: str, interactive: bool):
-    '''Configure and print intended actions from HOST.'''
-    host_path = Path(host)
-    deployed_host_tgt = get_deployed_host()
-    if deployed_host_tgt:
-        if deployed_host_tgt == host_path:
-            print(f'Redeploying same host: {str(deployed_host_tgt)}')
-        else:
-            print(f'Deploying over old host: {str(deployed_host_tgt)}')
+    ACTIVE_HOST_PATH.symlink_to(host_path)
+    host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
+    templater = Templater(MODOT_PATH, host_cfg)
+    if interactive:
+        _pick_theme_interactive(templater, host_cfg, theme_flag)
+        _pick_color_interactive(templater, host_cfg, color_flag)
     else:
-        print('Deploying host config: ' + str(host_path))
-    link_atomic(host_path, DEPLOYED_HOST)
-    config = ThemeEngine(host_path)
-    _pick_theme_maybe_interactive(config, theme_flag, interactive)
-    _pick_color_maybe_interactive(config, color_flag, interactive)
-    config.print_actions()
-    print(config.template_dict)
+        _pick_theme_noninteractive(templater, host_cfg, theme_flag)
+        _pick_color_noninteractive(templater, host_cfg, color_flag)
+    _check_and_deploy(templater, dryrun)
 
 
 @cli.command()
 def reload():
     '''Redeploy dotfiles from the previously deployed configuration.'''
-    deployed_host_tgt = get_deployed_host()
-    if not deployed_host_tgt or not deployed_host_tgt.exists():
-        sys.exit('No deployed host found')
-    config = ThemeEngine(deployed_host_tgt)
-    config.read_template_dict()
-    config.deploy()
+    host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
+    templater = Templater(MODOT_PATH, host_cfg)
+    _check_and_deploy(templater)
 
 
 @cli.group()
@@ -96,41 +77,35 @@ def theme():
     '''Commands controlling the deployed theme.'''
 
 
-@theme.command('list')
-def list_themes_cmd():
-    '''List all themes found in the themes directory.'''
-    config = ThemeEngine(get_deployed_host())
-    for filename in config.list_themes():
-        print(filename)
-
-
 @theme.command('get')
-def get_theme_cmd():
-    '''Print the currently deployed color.'''
-    deployed_theme = _get_theme()
+def get_theme():
+    '''Print the currently deployed theme.'''
+    deployed_theme = Templater(MODOT_PATH).get_theme()
     if deployed_theme:
         print(deployed_theme)
     else:
         sys.exit('No theme currently deployed')
 
 
-def _get_theme():
-    '''Print the currently deployed theme.'''
-    if ACTIVE_THEME_PATH.exists():
-        return Path(os.readlink(ACTIVE_THEME_PATH)).stem
-    else:
-        return None
+@theme.command('list')
+def list_themes():
+    '''List all themes found in the themes directory.'''
+    templater = Templater(MODOT_PATH,
+                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    for name in templater.list_themes():
+        print(name)
 
 
 @theme.command('set')
 @click.argument('name')
-def set_theme_cmd(name: str):
+def set_theme(name: str):
     '''Set the theme to NAME and redeploy.'''
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_themes():
+    templater = Templater(MODOT_PATH,
+                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    if name not in templater.list_themes():
         sys.exit(f'Could not find specified theme {name}')
-    config.set_theme(name)
-    config.deploy()
+    templater.set_theme(name)
+    _check_and_deploy(templater)
 
 
 @cli.group()
@@ -138,89 +113,71 @@ def color():
     '''Commands controlling the deployed colorscheme.'''
 
 
-@color.command('list')
-def list_colors_cmd():
-    '''List all colors found in the colors directory.'''
-    config = ThemeEngine(get_deployed_host())
-    for filename in config.list_colors():
-        print(filename)
-
-
 @color.command('get')
-def get_color_cmd():
+def get_color():
     '''Print the currently deployed color.'''
-    deployed_color = _get_color()
+    deployed_color = Templater(MODOT_PATH).get_color()
     if deployed_color:
         print(deployed_color)
     else:
         sys.exit('No color currently deployed')
 
 
-def _get_color() -> Optional[str]:
-    if ACTIVE_COLOR_PATH.exists():
-        return Path(os.readlink(ACTIVE_COLOR_PATH)).stem
-    else:
-        return None
+@color.command('list')
+def list_colors():
+    '''List all colors found in the colors directory.'''
+    templater = Templater(MODOT_PATH,
+                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    for name in templater.list_colors():
+        print(name)
 
 
 @color.command('set')
 @click.argument('name')
-def set_color_cmd(name: str):
+def set_color(name: str):
     '''Set the color to NAME and redeploy.'''
-    config = ThemeEngine(get_deployed_host())
-    if name not in config.list_colors():
-        sys.exit(f'Could not find specified theme {name}')
-    config.set_color(name)
-    config.deploy()
+    templater = Templater(MODOT_PATH,
+                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    if name not in templater.list_colors():
+        sys.exit(f'Could not find specified color {name}')
+    templater.set_color(name)
+    _check_and_deploy(templater)
 
 
-def _pick_theme_maybe_interactive(
-        config: ThemeEngine, flag: str, interactive: bool):
-    '''Picks a theme and maybe prompts based on current state/interactivity.'''
-    deployed_theme = _get_theme()
-    if flag:
-        picked_theme = flag
-    elif deployed_theme:
-        picked_theme = deployed_theme
-    elif interactive:
-        if config.default_theme:
-            picked_theme = click.prompt(
-                'Select a theme',
-                default=config.default_theme,
-                type=click.Choice(config.list_themes()))
-        else:
-            picked_theme = click.prompt(
-                'Select a theme',
-                type=click.Choice(config.list_themes()))
-    elif config.default_theme:
-        picked_theme = config.default_theme
-    else:
-        sys.exit(
-            'Could not find a theme to use, set with \'theme\' subcommand')
-    config.set_theme(picked_theme)
+def _check_and_deploy(templater: Templater, dryrun: bool = False):
+    '''Parse the modules, check rules, and deploy files.'''
+    raise NotImplementedError
 
 
-def _pick_color_maybe_interactive(
-        config: ThemeEngine, flag: str, interactive: bool):
-    '''Picks a color and maybe prompts based on current state/interactivity.'''
-    deployed_color = _get_color()
-    if flag:
-        picked_color = flag
-    elif deployed_color:
-        picked_color = deployed_color
-    elif interactive:
-        if config.default_color:
-            picked_color = click.prompt(
-                'Select a color',
-                default=config.default_color,
-                type=click.Choice(config.list_colors()))
-        else:
-            picked_color = click.prompt(
-                'Select a color',
-                type=click.Choice(config.list_colors()))
-    elif config.default_color:
-        picked_color = config.default_color
-    else:
-        sys.exit(
-            'Could not find a color to use, set with \'color\' subcommand')
-    config.set_color(picked_color)
+def _pick_theme_noninteractive(
+        templater: Templater, host_cfg: hostconfig.HostConfig, flag: str
+        ) -> str:
+    '''Picks a theme without prompting.'''
+    return flag or templater.get_theme() or host_cfg.default_theme
+
+
+def _pick_theme_interactive(
+        templater: Templater, host_cfg: hostconfig.HostConfig, flag: str
+        ) -> str:
+    '''Picks a theme and maybe prompts based on current state.'''
+    return flag or templater.get_theme() or click.prompt(
+        'Select a theme',
+        default=host_cfg.default_theme,
+        type=click.Choice(templater.list_themes()))
+
+
+def _pick_color_noninteractive(
+        templater: Templater, host_cfg: hostconfig.HostConfig, flag: str
+        ) -> str:
+    '''Picks a color without prompting.'''
+    return flag or templater.get_color() or host_cfg.default_color
+
+
+def _pick_color_interactive(
+        templater: Templater, host_cfg: hostconfig.HostConfig, flag: str
+        ) -> str:
+    '''Picks a color and maybe prompts based on current state.'''
+    return flag or templater.get_color() or click.prompt(
+        'Select a color',
+        default=host_cfg.default_color,
+        type=click.Choice(templater.list_colors()))
