@@ -47,7 +47,7 @@ class TestCat(unittest.TestCase):
         cat.rules = [Rule(Path(), Path())]
         self.assertTrue(str(cat))
 
-    def test_check_srcpaths_readable_outpath_dne_succeeds(self):
+    def test_check_srcpaths_exist_outpath_dne_succeeds(self):
         '''A cat with readable srcs and nonexistent out should pass checks.'''
         cat = Cat(Mock(spec=Templater))
         cat.rules = [
@@ -57,7 +57,7 @@ class TestCat(unittest.TestCase):
                  Path(self.tmpdir.name) / Path('dne'))]
         self.assertTrue(cat.check())
 
-    def test_check_srcpath_not_readable_fails(self):
+    def test_check_srcpath_not_file_fails(self):
         '''A cat where one src file isn't readable should fail checks.'''
         cat = Cat(Mock(spec=Templater))
         cat.rules = [
@@ -65,6 +65,16 @@ class TestCat(unittest.TestCase):
                  Path(self.tmpdir.name) / Path('outdne')),
             Rule(Path(self.srcfile2.name),
                  Path(self.tmpdir.name) / Path('outdne'))]
+        self.assertFalse(cat.check())
+
+    def test_check_outpaths_dont_match_fails(self):
+        '''A cat where the outpaths don't match should fail checks.'''
+        cat = Cat(Mock(spec=Templater))
+        cat.rules = [
+            Rule(Path(self.srcfile1.name),
+                 Path(self.tmpdir.name) / Path('outdne')),
+            Rule(Path(self.srcfile2.name),
+                 Path(self.tmpdir.name) / Path('differentdne'))]
         self.assertFalse(cat.check())
 
     def test_check_outpath_isdir_fails(self):
