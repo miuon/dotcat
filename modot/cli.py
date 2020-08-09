@@ -4,7 +4,9 @@ import sys
 
 import click
 
+from modot.cat import Cat
 from modot import hostconfig
+from modot import module_utils
 from modot.templater import Templater
 
 
@@ -49,10 +51,12 @@ def deploy(host: str, theme_flag: str, color_flag: str,
         if deployed_host_tgt == host_path:
             print(f'Redeploying same host: {str(deployed_host_tgt)}')
         else:
+            ACTIVE_HOST_PATH.unlink()
+            ACTIVE_HOST_PATH.symlink_to(host_path)
             print(f'Deploying over old host: {str(deployed_host_tgt)}')
     else:
         print('Deploying host config: ' + str(host_path))
-    ACTIVE_HOST_PATH.symlink_to(host_path)
+        ACTIVE_HOST_PATH.symlink_to(host_path)
     host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
     templater = Templater(MODOT_PATH, host_cfg)
     if interactive:
@@ -61,7 +65,7 @@ def deploy(host: str, theme_flag: str, color_flag: str,
     else:
         _pick_theme_noninteractive(templater, host_cfg, theme_flag)
         _pick_color_noninteractive(templater, host_cfg, color_flag)
-    _check_and_deploy(templater, dryrun)
+    _check_and_deploy(host_cfg, templater, dryrun)
 
 
 @cli.command()
@@ -69,7 +73,7 @@ def reload():
     '''Redeploy dotfiles from the previously deployed configuration.'''
     host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
     templater = Templater(MODOT_PATH, host_cfg)
-    _check_and_deploy(templater)
+    _check_and_deploy(host_cfg, templater, dryrun=False)
 
 
 @cli.group()
@@ -100,12 +104,12 @@ def list_themes():
 @click.argument('name')
 def set_theme(name: str):
     '''Set the theme to NAME and redeploy.'''
-    templater = Templater(MODOT_PATH,
-                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
+    templater = Templater(MODOT_PATH, host_cfg)
     if name not in templater.list_themes():
         sys.exit(f'Could not find specified theme {name}')
     templater.set_theme(name)
-    _check_and_deploy(templater)
+    _check_and_deploy(host_cfg, templater, dryrun=False)
 
 
 @cli.group()
@@ -136,17 +140,33 @@ def list_colors():
 @click.argument('name')
 def set_color(name: str):
     '''Set the color to NAME and redeploy.'''
-    templater = Templater(MODOT_PATH,
-                          hostconfig.from_file(ACTIVE_HOST_PATH))
+    host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
+    templater = Templater(MODOT_PATH, host_cfg)
     if name not in templater.list_colors():
         sys.exit(f'Could not find specified color {name}')
     templater.set_color(name)
-    _check_and_deploy(templater)
+    _check_and_deploy(host_cfg, templater, dryrun=True)
 
 
-def _check_and_deploy(templater: Templater, dryrun: bool = False):
+def _check_and_deploy(
+        host_cfg: hostconfig.HostConfig, templater: Templater,
+        dryrun: bool = True):
     '''Parse the modules, check rules, and deploy files.'''
-    raise NotImplementedError
+    cat_dict = {}
+    for module_path in module_utils.get_module_paths(host_cfg):
+        for rule in module_utils.get_rules(module_path):
+            if rule.out not in cat_dict:
+                cat_dict[rule.out] = Cat(templater)
+            cat_dict[rule.out].rules.append(rule)
+    for cat in cat_dict.values():
+        if dryrun:
+            print(cat)
+    for outpath, cat in cat_dict.items():
+        if not cat.check():
+            sys.exit(f'cat checks failed for outpath: {outpath}')
+    for cat in cat_dict.values():
+        if not dryrun:
+            cat.deploy()
 
 
 def _pick_theme_noninteractive(

@@ -14,9 +14,19 @@ class Cat():
         self.rules = []
         self.templater = templater
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         '''Return a string representation of this concat.'''
-        raise NotImplementedError
+        flag_strs = []
+        if any(rule.final for rule in self.rules):
+            flag_strs.append('final')
+        if any(rule.executable for rule in self.rules):
+            flag_strs.append('executable')
+        if any(rule.force_rewrite for rule in self.rules):
+            flag_strs.append('force_rewrite')
+        flag_str = ', '.join(flag_strs)
+        out = self.rules[0].out if self.rules else 'EMPTY'
+        src_str = '\n'.join(f'    {rule.src}' for rule in self.rules)
+        return f"Cat [{flag_str}]: {out}\n{src_str}"
 
     def __bool__(self) -> bool:
         '''Return true if this cat has any rules.'''
@@ -38,6 +48,6 @@ class Cat():
                 return False
         return True
 
-    def execute(self):
+    def deploy(self):
         '''Concatenate the configured source paths to write the target.'''
         raise NotImplementedError

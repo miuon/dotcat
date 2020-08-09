@@ -36,13 +36,13 @@ class TestCat(unittest.TestCase):
         cat.rules = [Rule(Path(), Path())]
         self.assertTrue(cat)
 
-    def test_repr_empty_exists(self):
-        '''An empty cat object should have a non-empty repr.'''
+    def test_str_empty_exists(self):
+        '''An empty cat object should have a string representation.'''
         cat = Cat(Mock(spec=Templater))
         self.assertTrue(str(cat))
 
-    def test_repr_nonempty_exists(self):
-        '''A cat object with a rule should have a non-empty repr.'''
+    def test_str_nonempty_exists(self):
+        '''A non-empty cat object should have a string representation.'''
         cat = Cat(Mock(spec=Templater))
         cat.rules = [Rule(Path(), Path())]
         self.assertTrue(str(cat))
