@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
+import yaml
+
 
 @dataclass
 class HostConfig():
@@ -17,7 +19,18 @@ class HostConfig():
 
 def from_file(host_path: Path) -> HostConfig:
     '''Gets a host configuration from the file at the given path.'''
-    raise NotImplementedError
+    with open(host_path, 'r') as stream:
+        host_dict = yaml.safe_load(stream)
+    host_cfg = HostConfig(
+        Path(host_dict['themes']).expanduser(),
+        Path(host_dict['colors']).expanduser())
+    host_cfg.default_theme = host_dict.get('default_theme')
+    host_cfg.default_color = host_dict.get('default_color')
+    host_cfg.domains = [
+        Path(dom).expanduser() for dom in host_dict.get('domains', [])]
+    host_cfg.modules = [
+        Path(mod).expanduser() for mod in host_dict.get('modules', [])]
+    return host_cfg
 
 
 def get_deployed_host(active_host_path) -> Optional[Path]:
