@@ -1,9 +1,14 @@
 '''Build generators for retrieving modules and rules from filesystem.'''
 from pathlib import Path
-from typing import Generator
+from typing import Generator, List
+
+import yaml
 
 from modot.hostconfig import HostConfig
 from modot.rule import Rule
+
+
+MODULE_CONF_FILENAME = 'module.yaml'
 
 
 def get_module_paths(host_cfg: HostConfig) -> Generator[Path, None, None]:
@@ -26,9 +31,31 @@ def get_module_paths(host_cfg: HostConfig) -> Generator[Path, None, None]:
             yield module_path
 
 
-def get_rules(module_path: Path) -> Generator[Rule, None, None]:
-    '''Parse the concat rules from a module file.'''
-    raise NotImplementedError
+def get_rules(module_path: Path) -> List[Rule]:
+    '''Parse the concat rules from a module.'''
+    module_conf_path = module_path / MODULE_CONF_FILENAME
+    with open(module_conf_path, 'r') as stream:
+        module_config = yaml.safe_load(stream)
+    rules = []
+    for src_str, conf_dict in module_config.items():
+        src_path = (module_path/src_str).expanduser()
+        out_path = Path(conf_dict['out']).expanduser()
+        if conf_dict.get('dir_contents', False):
+            for sub_path in src_path.iterdir():
+                sub_name = sub_path.name
+                rules.append(
+                    _rule_from_yaml(sub_path, out_path/sub_name, conf_dict))
+        else:
+            rules.append(_rule_from_yaml(src_path, out_path, conf_dict))
+    return rules
+
+
+def _rule_from_yaml(src: Path, out: Path, conf_dict: dict) -> Rule:
+    return Rule(src, out,
+                executable=conf_dict.get('exec', False),
+                final=conf_dict.get('final', False),
+                force_rewrite=conf_dict.get('force_rewrite', False))
+
 
 class DuplicateDomainError(Exception):
     '''Raised when a domain has been specified twice.'''
