@@ -50,4 +50,23 @@ class Cat():
 
     def deploy(self):
         '''Concatenate the configured source paths to write the target.'''
-        raise NotImplementedError
+        if not self.rules:
+            return
+        # Should be caught by the checks, but check again for safety
+        if not all(rule.out == self.rules[0].out for rule in self.rules):
+            raise ImproperOutpathError
+        out_strs = []
+        for rule in self.rules:
+            out_strs.append(self.templater.template(rule.src.read_text()))
+        out_str = '\n'.join(out_str for out_str in out_strs if out_str)
+        out_path = self.rules[0].out
+        force_rewrite = any(rule.force_rewrite for rule in self.rules)
+        out_path.chmod(0o644)
+        if out_str != out_path.read_text() or force_rewrite:
+            out_path.write_text(out_str)
+        executable = any(rule.executable for rule in self.rules)
+        out_path.chmod(0o544 if executable else 0o444)
+
+
+class ImproperOutpathError(Exception):
+    '''Raised when a cat is not outputting to the right place.'''

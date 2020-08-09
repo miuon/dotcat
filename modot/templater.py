@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
+import chevron
+
 from modot.hostconfig import HostConfig
 
 
@@ -71,6 +73,18 @@ class _ThemeColorCache:
     def get_themecolor(self) -> dict:
         '''Return the themecolor dict, either from files or cache.'''
         raise NotImplementedError
+
+
+class FakeTemplater(Templater):
+    '''Fake templater that takes a dict to use for templating.'''
+    def __init__(self, modot_path: Path, template_dict: dict):
+        '''Save the fake dict.'''
+        super().__init__(self, modot_path)
+        self.template_dict = template_dict
+
+    def template(self, src_string: str) -> str:
+        '''Template the string with the explicitly specified dictionary.'''
+        return chevron.render(src_string, self.template_dict)
 
 
 class LinkMalformedError(Exception):
