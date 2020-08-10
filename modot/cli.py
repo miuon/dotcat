@@ -145,7 +145,7 @@ def set_color(name: str):
     if name not in templater.list_colors():
         sys.exit(f'Could not find specified color {name}')
     templater.set_color(name)
-    _check_and_deploy(host_cfg, templater, dryrun=True)
+    _check_and_deploy(host_cfg, templater, dryrun=False)
 
 
 def _check_and_deploy(
