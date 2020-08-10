@@ -182,28 +182,44 @@ class TestTemplaterTemplate(unittest.TestCase):
     '''Test the templater template method/related functionality.'''
     def setUp(self):
         '''Set up some temp directories for test.'''
-        self.link_dir = TemporaryDirectory()
-        self.theme_dir = TemporaryDirectory()
-        self.color_dir = TemporaryDirectory()
+        self.link_dir_handle = TemporaryDirectory()
+        self.link_dir = Path(self.link_dir_handle.name)
+        self.theme_dir_handle = TemporaryDirectory()
+        self.theme_dir = Path(self.theme_dir_handle.name)
+        self.color_dir_handle = TemporaryDirectory()
+        self.color_dir = Path(self.color_dir_handle.name)
+
+    def tearDown(self):
+        self.link_dir_handle.cleanup()
+        self.theme_dir_handle.cleanup()
+        self.color_dir_handle.cleanup()
 
     def test_template(self):
         '''Test templating a string.'''
-        raise unittest.SkipTest
+        theme_path = self.theme_dir/'main.yaml'
+        color_path = self.color_dir/'main.yaml'
+        (self.link_dir/'theme.yaml').symlink_to(theme_path)
+        (self.link_dir/'color.yaml').symlink_to(color_path)
+        theme_path.write_text('theme: cooltheme')
+        color_path.write_text('color: coolcolor')
+        host_cfg = HostConfig(self.theme_dir, self.color_dir)
+        templater = Templater(self.link_dir, host_cfg)
+        out_str = templater.template('theme: {{theme}}\ncolor: {{color}}')
+        self.assertEqual(out_str, 'theme: cooltheme\ncolor: coolcolor')
 
-    def test_set_theme_clears_cache(self):
-        '''Setting the active theme should clear the cache.'''
-        host_config = HostConfig(
-            Path(self.theme_dir.name), None)
-        templater = Templater(Path(self.link_dir.name), host_config)
-        templater._themecolor_cache = {}
-        templater.set_theme('cooltheme')
-        self.assertIsNone(templater._themecolor_cache)
-
-    def test_set_color_clears_cache(self):
-        '''Setting the active color should clear the cache.'''
-        host_config = HostConfig(
-            Path(self.color_dir.name), Path(self.color_dir.name))
-        templater = Templater(Path(self.link_dir.name), host_config)
-        templater._themecolor_cache = {}
-        templater.set_color('coolcolor')
-        self.assertIsNone(templater._themecolor_cache)
+    def test_template_after_set_color(self):
+        '''Test that set_color changes the output even after first use.'''
+        theme_path = self.theme_dir/'main.yaml'
+        color_path = self.color_dir/'main.yaml'
+        new_color_path = self.color_dir/'new.yaml'
+        (self.link_dir/'theme.yaml').symlink_to(theme_path)
+        (self.link_dir/'color.yaml').symlink_to(color_path)
+        theme_path.write_text('theme: cooltheme')
+        color_path.write_text('color: coolcolor')
+        new_color_path.write_text('color: newcolor')
+        host_cfg = HostConfig(self.theme_dir, self.color_dir)
+        templater = Templater(self.link_dir, host_cfg)
+        templater.template('theme: {{theme}}\ncolor: {{color}}')
+        templater.set_color('new')
+        out_str = templater.template('theme: {{theme}}\ncolor: {{color}}')
+        self.assertEqual(out_str, 'theme: cooltheme\ncolor: newcolor')
