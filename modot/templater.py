@@ -15,6 +15,7 @@ class Templater:
         '''Initialize the templater and inject dependencies.'''
         self.modot_path = modot_path
         self.host_cfg = host_config
+        self._themecolor_cache: Optional[dict] = None
 
     def get_theme(self) -> Optional[str]:
         '''Return the currently deployed theme or None.'''
@@ -34,11 +35,17 @@ class Templater:
 
     def set_theme(self, name: str):
         '''Set the active theme.'''
-        raise NotImplementedError
+        new_theme_path = self.host_cfg.themes_path / (name + '.yaml')
+        (self.modot_path/'theme.yaml').unlink(missing_ok=True)
+        (self.modot_path/'theme.yaml').symlink_to(new_theme_path)
+        self._themecolor_cache = None
 
     def set_color(self, name: str):
         '''Set the active color.'''
-        raise NotImplementedError
+        new_color_path = self.host_cfg.colors_path / (name + '.yaml')
+        (self.modot_path/'color.yaml').unlink(missing_ok=True)
+        (self.modot_path/'color.yaml').symlink_to(new_color_path)
+        self._themecolor_cache = None
 
     def template(self, src_string: str) -> str:
         '''Template the provided string with the active theme and color.'''
