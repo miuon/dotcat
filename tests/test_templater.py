@@ -207,6 +207,35 @@ class TestTemplaterTemplate(unittest.TestCase):
         out_str = templater.template('theme: {{theme}}\ncolor: {{color}}')
         self.assertEqual(out_str, 'theme: cooltheme\ncolor: coolcolor')
 
+    def test_template_conf_dne(self):
+        '''Test templating a string.'''
+        theme_path = self.theme_dir/'main.yaml'
+        color_path = self.color_dir/'main.yaml'
+        (self.link_dir/'theme.yaml').symlink_to(theme_path)
+        (self.link_dir/'color.yaml').symlink_to(color_path)
+        theme_path.write_text('theme: cooltheme')
+        host_cfg = HostConfig(self.theme_dir, self.color_dir)
+        templater = Templater(self.link_dir, host_cfg)
+        with self.assertRaises(LinkMalformedError):
+            templater.template('theme: {{theme}}\ncolor: {{color}}')
+
+    def test_template_after_set_theme(self):
+        '''Test that set_color changes the output even after first use.'''
+        theme_path = self.theme_dir/'main.yaml'
+        color_path = self.color_dir/'main.yaml'
+        new_theme_path = self.theme_dir/'new.yaml'
+        (self.link_dir/'theme.yaml').symlink_to(theme_path)
+        (self.link_dir/'color.yaml').symlink_to(color_path)
+        theme_path.write_text('theme: cooltheme')
+        color_path.write_text('color: coolcolor')
+        new_theme_path.write_text('theme: newtheme')
+        host_cfg = HostConfig(self.theme_dir, self.color_dir)
+        templater = Templater(self.link_dir, host_cfg)
+        templater.template('theme: {{theme}}\ncolor: {{color}}')
+        templater.set_theme('new')
+        out_str = templater.template('theme: {{theme}}\ncolor: {{color}}')
+        self.assertEqual(out_str, 'theme: newtheme\ncolor: coolcolor')
+
     def test_template_after_set_color(self):
         '''Test that set_color changes the output even after first use.'''
         theme_path = self.theme_dir/'main.yaml'

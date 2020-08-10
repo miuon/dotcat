@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import chevron
+import yaml
 
 from modot.hostconfig import HostConfig
 
@@ -49,7 +50,21 @@ class Templater:
 
     def template(self, src_string: str) -> str:
         '''Template the provided string with the active theme and color.'''
-        raise NotImplementedError
+        if self._themecolor_cache is None:
+            self._themecolor_cache = self._read_themecolor_config()
+        return chevron.render(src_string, self._themecolor_cache)
+
+    def _read_themecolor_config(self) -> dict:
+        '''Read and merge the active theme and color configs.'''
+        active_theme = self.modot_path/'theme.yaml'
+        active_color = self.modot_path/'color.yaml'
+        if (not active_theme.exists() or not active_color.exists()):
+            raise LinkMalformedError
+        with open(active_theme, 'r') as stream:
+            theme_dict = yaml.safe_load(stream)
+        with open(active_color, 'r') as stream:
+            color_dict = yaml.safe_load(stream)
+        return {**color_dict, **theme_dict}
 
     @staticmethod
     def _retrieve_config_link(active_path: Path):
@@ -69,19 +84,6 @@ class Templater:
         return [cfg_path.stem for cfg_path in dir_path.iterdir()]
 
 
-class _ThemeColorCache:
-    def __init__(self):
-        raise NotImplementedError
-
-    def invalidate(self):
-        '''Invalidate the themecolor cache.'''
-        raise NotImplementedError
-
-    def get_themecolor(self) -> dict:
-        '''Return the themecolor dict, either from files or cache.'''
-        raise NotImplementedError
-
-
 class FakeTemplater(Templater):
     '''Fake templater that takes a dict to use for templating.'''
     def __init__(self, modot_path: Path, template_dict: dict):
@@ -95,4 +97,4 @@ class FakeTemplater(Templater):
 
 
 class LinkMalformedError(Exception):
-    pass
+    '''Raised when one of the symlinks is formatted incorrectly.'''
