@@ -2,7 +2,7 @@
 from setuptools import setup
 setup(
     name='modot',
-    version='0.4',
+    version='0.5',
     description='MOdular DOTfiles',
     url='https://github.com/miuon/modot',
     author='miuon',
