@@ -28,8 +28,7 @@ def from_file(host_path: Path) -> HostConfig:
     host_cfg.default_color = host_dict.get('default_color')
     host_cfg.domains = [
         Path(dom).expanduser() for dom in host_dict.get('domains', [])]
-    host_cfg.modules = [
-        Path(mod).expanduser() for mod in host_dict.get('modules', [])]
+    host_cfg.modules = host_dict.get('modules', [])
     return host_cfg
 
 

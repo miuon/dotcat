@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-import chevron
+import chevron  # type: ignore
 import yaml
 
 from modot.hostconfig import HostConfig
@@ -28,14 +28,20 @@ class Templater:
 
     def list_themes(self) -> List[str]:
         '''Return all available themes.'''
+        if not self.host_cfg or not self.host_cfg.themes_path:
+            return []
         return self._get_directory_yaml_names(self.host_cfg.themes_path)
 
     def list_colors(self) -> List[str]:
         '''Return all available colors.'''
+        if not self.host_cfg or not self.host_cfg.colors_path:
+            return []
         return self._get_directory_yaml_names(self.host_cfg.colors_path)
 
     def set_theme(self, name: str):
         '''Set the active theme.'''
+        if not self.host_cfg or not self.host_cfg.themes_path:
+            raise AttributeError
         new_theme_path = self.host_cfg.themes_path / (name + '.yaml')
         (self.modot_path/'theme.yaml').unlink(missing_ok=True)
         (self.modot_path/'theme.yaml').symlink_to(new_theme_path)
@@ -43,6 +49,8 @@ class Templater:
 
     def set_color(self, name: str):
         '''Set the active color.'''
+        if not self.host_cfg or not self.host_cfg.colors_path:
+            raise AttributeError
         new_color_path = self.host_cfg.colors_path / (name + '.yaml')
         (self.modot_path/'color.yaml').unlink(missing_ok=True)
         (self.modot_path/'color.yaml').symlink_to(new_color_path)
@@ -88,7 +96,7 @@ class FakeTemplater(Templater):
     '''Fake templater that takes a dict to use for templating.'''
     def __init__(self, modot_path: Path, template_dict: dict):
         '''Save the fake dict.'''
-        super().__init__(self, modot_path)
+        super().__init__(modot_path)
         self.template_dict = template_dict
 
     def template(self, src_string: str) -> str:
