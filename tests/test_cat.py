@@ -114,6 +114,21 @@ class TestCat(unittest.TestCase):
             self.outfile.read_text(),
             'theme: cooltheme\nforeground: white\nbackground: blue')
 
+    def test_deploy_outfile_dne_write(self):
+        '''A cat that would change the content of the file should write it.'''
+        cat = Cat(FakeTemplater(
+            self.tmpdir,
+            {'theme': 'cooltheme', 'colorfg': 'white', 'colorbg': 'blue'}))
+        cat.rules = [
+            Rule(self.srcfile1, self.tmpdir/'newoutfile'),
+            Rule(self.srcfile2, self.tmpdir/'newoutfile')]
+        self.srcfile1.write_text('theme: {{theme}}\nforeground: {{colorfg}}')
+        self.srcfile2.write_text('background: {{ colorbg }}')
+        cat.deploy()
+        self.assertEqual(
+            (self.tmpdir/'newoutfile').read_text(),
+            'theme: cooltheme\nforeground: white\nbackground: blue')
+
     def test_deploy_file_dne_raises(self):
         '''A cat should raise an error if a src file dne.'''
         cat = Cat(FakeTemplater(
