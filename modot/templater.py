@@ -43,8 +43,10 @@ class Templater:
         if not self.host_cfg or not self.host_cfg.themes_path:
             raise AttributeError
         new_theme_path = self.host_cfg.themes_path / (name + '.yaml')
-        (self.modot_path/'theme.yaml').unlink(missing_ok=True)
-        (self.modot_path/'theme.yaml').symlink_to(new_theme_path)
+        active_theme = self.modot_path/'theme.yaml'
+        if active_theme.exists() or active_theme.is_symlink():
+            active_theme.unlink()
+        active_theme.symlink_to(new_theme_path)
         self._themecolor_cache = None
 
     def set_color(self, name: str):
@@ -52,8 +54,10 @@ class Templater:
         if not self.host_cfg or not self.host_cfg.colors_path:
             raise AttributeError
         new_color_path = self.host_cfg.colors_path / (name + '.yaml')
-        (self.modot_path/'color.yaml').unlink(missing_ok=True)
-        (self.modot_path/'color.yaml').symlink_to(new_color_path)
+        active_color = self.modot_path/'color.yaml'
+        if active_color.exists() or active_color.is_symlink():
+            active_color.unlink()
+        active_color.symlink_to(new_color_path)
         self._themecolor_cache = None
 
     def template(self, src_string: str) -> str:
