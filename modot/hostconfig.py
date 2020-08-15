@@ -34,9 +34,8 @@ def from_file(host_path: Path) -> HostConfig:
 
 def get_deployed_host(active_host_path) -> Optional[Path]:
     '''Returns the path to the deployed host, if there is one.'''
-    if active_host_path.exists():
-        if not active_host_path.is_symlink():
-            raise FileExistsError
-        return active_host_path.resolve()
-    else:
+    if not active_host_path.exists():
         return None
+    if not active_host_path.is_symlink():
+        raise FileExistsError
+    return active_host_path.resolve()
