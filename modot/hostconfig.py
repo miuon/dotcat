@@ -28,16 +28,14 @@ def from_file(host_path: Path) -> HostConfig:
     host_cfg.default_color = host_dict.get('default_color')
     host_cfg.domains = [
         Path(dom).expanduser() for dom in host_dict.get('domains', [])]
-    host_cfg.modules = [
-        Path(mod).expanduser() for mod in host_dict.get('modules', [])]
+    host_cfg.modules = host_dict.get('modules', [])
     return host_cfg
 
 
 def get_deployed_host(active_host_path) -> Optional[Path]:
     '''Returns the path to the deployed host, if there is one.'''
-    if active_host_path.exists():
-        if not active_host_path.is_symlink():
-            raise FileExistsError
-        return active_host_path.resolve()
-    else:
+    if not active_host_path.exists():
         return None
+    if not active_host_path.is_symlink():
+        raise FileExistsError
+    return active_host_path.resolve()

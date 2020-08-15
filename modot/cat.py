@@ -60,9 +60,12 @@ class Cat():
             out_strs.append(self.templater.template(rule.src.read_text()))
         out_str = '\n'.join(out_str for out_str in out_strs if out_str)
         out_path = self.rules[0].out
+        old_out_text = None
         force_rewrite = any(rule.force_rewrite for rule in self.rules)
-        out_path.chmod(0o644)
-        if out_str != out_path.read_text() or force_rewrite:
+        if out_path.exists():
+            out_path.chmod(0o644)
+            old_out_text = out_path.read_text()
+        if out_str != old_out_text or force_rewrite:
             out_path.write_text(out_str)
         executable = any(rule.executable for rule in self.rules)
         out_path.chmod(0o544 if executable else 0o444)

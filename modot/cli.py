@@ -22,7 +22,7 @@ def cli(ctx: click.Context):
 
     Run without a command for a summary of current state.
     '''
-    MODOT_PATH.mkdir(exist_ok=True)
+    MODOT_PATH.mkdir(exist_ok=True, parents=True)
     if ctx.invoked_subcommand is None:
         host = hostconfig.get_deployed_host(ACTIVE_HOST_PATH)
         print(f'Deployed: {str(host)}' if host else 'No deployed host config')
@@ -60,11 +60,15 @@ def deploy(host: str, theme_flag: str, color_flag: str,
     host_cfg = hostconfig.from_file(ACTIVE_HOST_PATH)
     templater = Templater(MODOT_PATH, host_cfg)
     if interactive:
-        _pick_theme_interactive(templater, host_cfg, theme_flag)
-        _pick_color_interactive(templater, host_cfg, color_flag)
+        theme_name = _pick_theme_interactive(templater, host_cfg, theme_flag)
+        color_name = _pick_color_interactive(templater, host_cfg, color_flag)
     else:
-        _pick_theme_noninteractive(templater, host_cfg, theme_flag)
-        _pick_color_noninteractive(templater, host_cfg, color_flag)
+        theme_name = _pick_theme_noninteractive(
+            templater, host_cfg, theme_flag)
+        color_name = _pick_color_noninteractive(
+            templater, host_cfg, color_flag)
+    templater.set_theme(theme_name)
+    templater.set_color(color_name)
     _check_and_deploy(host_cfg, templater, dryrun)
 
 

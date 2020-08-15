@@ -10,7 +10,7 @@ from modot.templater import FakeTemplater, Templater
 
 
 class TestCat(unittest.TestCase):
-    '''Test templater configuration and usage.'''
+    '''Test concat module configuration and magic methods.'''
     def setUp(self):
         '''Set up some tempfile objects and write to them.'''
         self.tmpdir_handle = TemporaryDirectory()
@@ -98,6 +98,28 @@ class TestCat(unittest.TestCase):
             Rule(self.srcfile2, self.tmpdir)]
         self.assertFalse(cat.check())
 
+
+class TestCatDeploy(unittest.TestCase):
+    '''Test concat module deployment.'''
+
+    def setUp(self):
+        '''Set up some tempfile objects and write to them.'''
+        self.tmpdir_handle = TemporaryDirectory()
+        self.tmpdir = Path(self.tmpdir_handle.name)
+        srcfile1_handle = NamedTemporaryFile()
+        self.srcfile1 = Path(srcfile1_handle.name)
+        srcfile2_handle = NamedTemporaryFile()
+        self.srcfile2 = Path(srcfile2_handle.name)
+        outfile_handle = NamedTemporaryFile()
+        self.outfile = Path(outfile_handle.name)
+        self.handles = (srcfile1_handle, srcfile2_handle, outfile_handle)
+
+    def tearDown(self):
+        '''Ensure the tempfiles are destroyed.'''
+        self.tmpdir_handle.cleanup()
+        for handle in self.handles:
+            handle.close()
+
     def test_deploy_nonequal_files_write(self):
         '''A cat that would change the content of the file should write it.'''
         cat = Cat(FakeTemplater(
@@ -112,6 +134,21 @@ class TestCat(unittest.TestCase):
         cat.deploy()
         self.assertEqual(
             self.outfile.read_text(),
+            'theme: cooltheme\nforeground: white\nbackground: blue')
+
+    def test_deploy_outfile_dne_write(self):
+        '''A cat that would change the content of the file should write it.'''
+        cat = Cat(FakeTemplater(
+            self.tmpdir,
+            {'theme': 'cooltheme', 'colorfg': 'white', 'colorbg': 'blue'}))
+        cat.rules = [
+            Rule(self.srcfile1, self.tmpdir/'newoutfile'),
+            Rule(self.srcfile2, self.tmpdir/'newoutfile')]
+        self.srcfile1.write_text('theme: {{theme}}\nforeground: {{colorfg}}')
+        self.srcfile2.write_text('background: {{ colorbg }}')
+        cat.deploy()
+        self.assertEqual(
+            (self.tmpdir/'newoutfile').read_text(),
             'theme: cooltheme\nforeground: white\nbackground: blue')
 
     def test_deploy_file_dne_raises(self):
