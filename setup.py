@@ -2,7 +2,7 @@
 from setuptools import setup
 setup(
     name='modot',
-    version='0.5',
+    version='0.5.1',
     description='MOdular DOTfiles',
     url='https://github.com/miuon/modot',
     author='miuon',
@@ -10,7 +10,7 @@ setup(
     packages=['modot'],
     test_suite='tests',
 
-    python_requires=">=3.5",
+    python_requires=">=3.7",
     install_requires=[
         'chevron',
         'Click',
