@@ -1,4 +1,4 @@
-''' CLI for modot command (MOdular DOTfiles).'''
+'''CLI for modot command (MOdular DOTfiles).'''
 from pathlib import Path
 import sys
 
